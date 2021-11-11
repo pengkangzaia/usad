@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.nn import functional as F
+
 from utils import *
 
 device = get_default_device()
@@ -108,40 +108,42 @@ def evaluate(model, val_loader, n):
 
 
 def training(epochs, model, train_loader, val_loader, opt_func=torch.optim.Adam):
-    history = []
-    optimizer1 = opt_func(list(model.encoder.parameters()) + list(model.decoder1.parameters()))
-    optimizer2 = opt_func(list(model.encoder.parameters()) + list(model.decoder2.parameters()))
-    for epoch in range(epochs):
-        for [batch] in train_loader:
-            batch = to_device(batch, device)
+    with torch.no_grad:
+        history = []
+        optimizer1 = opt_func(list(model.encoder.parameters()) + list(model.decoder1.parameters()))
+        optimizer2 = opt_func(list(model.encoder.parameters()) + list(model.decoder2.parameters()))
+        for epoch in range(epochs):
+            for [batch] in train_loader:
+                batch = to_device(batch, device)
 
-            # Train AE1
-            loss1, loss2 = model.training_step(batch, epoch + 1)
-            # 更新 AE1
-            loss1.backward()
-            optimizer1.step()
-            optimizer1.zero_grad()
+                # Train AE1
+                loss1, loss2 = model.training_step(batch, epoch + 1)
+                # 更新 AE1
+                loss1.backward()
+                optimizer1.step()
+                optimizer1.zero_grad()
 
-            # Train AE2
-            loss1, loss2 = model.training_step(batch, epoch + 1)
-            # 更新 AE2
-            loss2.backward()
-            optimizer2.step()
-            optimizer2.zero_grad()
+                # Train AE2
+                loss1, loss2 = model.training_step(batch, epoch + 1)
+                # 更新 AE2
+                loss2.backward()
+                optimizer2.step()
+                optimizer2.zero_grad()
 
-        result = evaluate(model, val_loader, epoch + 1)
-        model.epoch_end(epoch, result)
-        history.append(result)
-    return history
+            result = evaluate(model, val_loader, epoch + 1)
+            model.epoch_end(epoch, result)
+            history.append(result)
+        return history
 
 
 def testing(model, test_loader, alpha=.5, beta=.5):
-    results = []
-    for [batch] in test_loader:
-        batch = to_device(batch, device)
-        z_mean1, z_log_var1 = model.encoder(batch)
-        w1 = model.decoder1(reparameterization(z_mean1, z_log_var1))
-        z_mean2, z_log_var2 = model.encoder(w1)
-        w2 = model.decoder2(reparameterization(z_mean2, z_log_var2))
-        results.append(alpha * torch.mean((batch - w1) ** 2, axis=1) + beta * torch.mean((batch - w2) ** 2, axis=1))
-    return results
+    with torch.no_grad:
+        results = []
+        for [batch] in test_loader:
+            batch = to_device(batch, device)
+            z_mean1, z_log_var1 = model.encoder(batch)
+            w1 = model.decoder1(reparameterization(z_mean1, z_log_var1))
+            z_mean2, z_log_var2 = model.encoder(w1)
+            w2 = model.decoder2(reparameterization(z_mean2, z_log_var2))
+            results.append(alpha * torch.mean((batch - w1) ** 2, axis=1) + beta * torch.mean((batch - w2) ** 2, axis=1))
+        return results
