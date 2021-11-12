@@ -111,6 +111,5 @@ def testing(model, test_loader, alpha=.5, beta=.5):
         batch = to_device(batch, device)
         z_mean1, z_log_var1 = model.encoder(batch)
         w1 = model.decoder(reparameterization(z_mean1, z_log_var1))
-        recon_loss = loss_function(batch, w1, z_mean1, z_log_var1)
-        results.append(recon_loss)
+        results.append(torch.mean((batch-w1)**2,axis=1))
     return results
