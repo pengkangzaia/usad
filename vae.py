@@ -73,7 +73,7 @@ class VAE(nn.Module):
     def validation_epoch_end(self, outputs):
         batch_losses = [x['val_loss'] for x in outputs]
         epoch_loss = torch.stack(batch_losses).mean()
-        return {'val_loss1': epoch_loss.item()}
+        return {'val_loss': epoch_loss.item()}
 
     def epoch_end(self, epoch, result):
         print(
