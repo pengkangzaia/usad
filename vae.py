@@ -106,10 +106,11 @@ def training(epochs, model, train_loader, val_loader, opt_func=torch.optim.Adam)
 
 
 def testing(model, test_loader, alpha=.5, beta=.5):
-    results = []
-    for [batch] in test_loader:
-        batch = to_device(batch, device)
-        z_mean1, z_log_var1 = model.encoder(batch)
-        w1 = model.decoder(reparameterization(z_mean1, z_log_var1))
-        results.append(torch.mean((batch-w1)**2,axis=1))
-    return results
+    with torch.no_grad():
+        results = []
+        for [batch] in test_loader:
+            batch = to_device(batch, device)
+            z_mean1, z_log_var1 = model.encoder(batch)
+            w1 = model.decoder(reparameterization(z_mean1, z_log_var1))
+            results.append(torch.mean((batch-w1)**2,axis=1))
+        return results
