@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from utils import *
+
 device = get_default_device()
 
 
@@ -44,7 +45,7 @@ def loss_function(origin, reconstruction, mean, log_var):
 
 
 def reparameterization(mean, log_var):
-    epsilon = torch.randn(mean.size())
+    epsilon = torch.randn(mean.size()).to(device)
     res = mean + torch.exp(log_var / 2) * epsilon
     return res
 
