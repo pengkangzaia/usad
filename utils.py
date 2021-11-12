@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
 
-from sklearn.metrics import roc_curve,roc_auc_score
+from sklearn.metrics import roc_curve,roc_auc_score,f1_score,precision_score
 
 def get_default_device():
     """Pick GPU if available, else CPU"""
@@ -20,17 +20,19 @@ def to_device(data, device):
     return data.to(device, non_blocking=True)
     
 def plot_history(history):
-    # losses1 = [x['val_loss1'] for x in history]
-    # losses2 = [x['val_loss2'] for x in history]
-    # plt.plot(losses1, '-x', label="loss1")
-    # plt.plot(losses2, '-x', label="loss2")
-    # plt.xlabel('epoch')
-    # plt.ylabel('loss')
-    # plt.legend()
-    # plt.title('Losses vs. No. of epochs')
-    # plt.grid()
-    # plt.show()
+    losses1 = [x['val_loss1'] for x in history]
+    losses2 = [x['val_loss2'] for x in history]
+    plt.plot(losses1, '-x', label="loss1")
+    plt.plot(losses2, '-x', label="loss2")
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.legend()
+    plt.title('Losses vs. No. of epochs')
+    plt.grid()
+    plt.show()
 
+
+def plot_simple_history(history):
     losses = [x['val_loss'] for x in history]
     plt.plot(losses, '-x', label="loss")
     plt.xlabel('epoch')
@@ -78,3 +80,14 @@ def confusion_matrix(target, predicted, perc=False):
     else:
         sns.heatmap(confusion_matrix, annot=True, fmt='d')
     plt.show()
+
+
+def max_f1_score(y_test, y_pred):
+    res = 0
+    for threshold in range(0, 1000, 1):
+        th = threshold / 1000
+        y_clone = y_pred.copy()
+        y_clone[y_clone >= th] = 1
+        y_clone[y_clone < th] = 0
+        res = max(res, f1_score(y_test, y_clone, average='binary'))
+    return res
