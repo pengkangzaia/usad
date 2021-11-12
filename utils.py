@@ -20,10 +20,19 @@ def to_device(data, device):
     return data.to(device, non_blocking=True)
     
 def plot_history(history):
-    losses1 = [x['val_loss1'] for x in history]
-    losses2 = [x['val_loss2'] for x in history]
-    plt.plot(losses1, '-x', label="loss1")
-    plt.plot(losses2, '-x', label="loss2")
+    # losses1 = [x['val_loss1'] for x in history]
+    # losses2 = [x['val_loss2'] for x in history]
+    # plt.plot(losses1, '-x', label="loss1")
+    # plt.plot(losses2, '-x', label="loss2")
+    # plt.xlabel('epoch')
+    # plt.ylabel('loss')
+    # plt.legend()
+    # plt.title('Losses vs. No. of epochs')
+    # plt.grid()
+    # plt.show()
+
+    losses = [x['val_loss'] for x in history]
+    plt.plot(losses, '-x', label="loss")
     plt.xlabel('epoch')
     plt.ylabel('loss')
     plt.legend()
