@@ -140,7 +140,7 @@ def training(epochs, model, train_loader, val_loader, opt_func=torch.optim.Adam)
 
 
 def testing(model, test_loader, alpha=.5, beta=.5):
-    with torch.no_grad:
+    with torch.no_grad():
         results = []
         for [batch] in test_loader:
             batch = to_device(batch, device)
