@@ -43,6 +43,12 @@ def loss_function(origin, reconstruction, mean, log_var):
     KL_divergence = -0.5 * torch.sum(1 + log_var - torch.exp(log_var) - mean * mean)
     return reconstruction_loss + KL_divergence
 
+def loss_function_pro(origin, reconstruction, mean, log_var):
+    mse = nn.MSELoss()
+    reconstruction_loss = mse(reconstruction, origin)
+    KL_divergence = -0.5 * torch.mean(1 + log_var - torch.exp(log_var) - mean * mean)
+    return reconstruction_loss + KL_divergence
+
 
 def reparameterization(mean, log_var):
     epsilon = torch.randn(mean.size()).to(device)
@@ -69,9 +75,9 @@ class VAEUSADModel(nn.Module):
         gan_z_mean, gan_z_log_var = self.encoder(w1)
         w3 = self.decoder2(reparameterization(gan_z_mean, gan_z_log_var))
         # 损失分为两部分，在训练的前期n比较小，1/n比较大，阶段1的损失函数作为主体。在训练的后期1/n比较大，阶段2的损失函数作为主题
-        recon_loss1 = loss_function(batch, w1, z_mean, z_log_var)
-        recon_loss2 = loss_function(batch, w2, z_mean, z_log_var)
-        gan_loss = loss_function(batch, w3, gan_z_mean, gan_z_log_var)
+        recon_loss1 = loss_function_pro(batch, w1, z_mean, z_log_var)
+        recon_loss2 = loss_function_pro(batch, w2, z_mean, z_log_var)
+        gan_loss = loss_function_pro(batch, w3, gan_z_mean, gan_z_log_var)
         loss1 = weight * torch.mean(recon_loss1) + (1 - weight) * torch.mean(gan_loss)
         loss2 = weight * torch.mean(recon_loss2) - (1 - weight) * torch.mean(gan_loss)
         return loss1, loss2
@@ -87,12 +93,13 @@ class VAEUSADModel(nn.Module):
         gan_mean, gan_z_log_var = self.encoder(w1)
         w3 = self.decoder2(reparameterization(gan_mean, gan_z_log_var))
         # 计算损失
-        recon_loss1 = loss_function(batch, w1, z_mean, z_log_var)
-        recon_loss2 = loss_function(batch, w2, z_mean, z_log_var)
-        gan_loss = loss_function(batch, w3, gan_mean, gan_z_log_var)
+        recon_loss1 = loss_function_pro(batch, w1, z_mean, z_log_var)
+        recon_loss2 = loss_function_pro(batch, w2, z_mean, z_log_var)
+        gan_loss = loss_function_pro(batch, w3, gan_mean, gan_z_log_var)
         loss1 = weight * torch.mean(recon_loss1) + (1 - weight) * torch.mean(gan_loss)
         loss2 = weight * torch.mean(recon_loss2) - (1 - weight) * torch.mean(gan_loss)
-        return {'val_loss1': loss1, 'val_loss2': loss2}
+        return {'val_loss1': loss1, 'val_loss2': loss2, 'recon_loss1': recon_loss1, 'recon_loss2': recon_loss2,
+                'gan_loss': gan_loss}
 
     def validation_epoch_end(self, outputs):
         batch_losses1 = [x['val_loss1'] for x in outputs]
