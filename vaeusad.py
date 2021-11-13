@@ -67,7 +67,7 @@ class VAEUSADModel(nn.Module):
     def training_step(self, batch, n):
         # 两阶段训练权重
         # weight = (1 - (n / self.epochs) ** 2) ** 0.5
-        weight = 1 / n
+        weight = 1 - 1 / n
         z_mean, z_log_var = self.encoder(batch)
         # 自编码器训练
         w1 = self.decoder1(reparameterization(z_mean, z_log_var))
@@ -86,7 +86,7 @@ class VAEUSADModel(nn.Module):
     def validation_step(self, batch, n):
         # 两阶段训练权重
         # weight = (1 - (n / self.epochs) ** 2) ** 0.5
-        weight = 1 / n
+        weight = 1 - 1 / n
         # vae重构
         z_mean, z_log_var = self.encoder(batch)
         w1 = self.decoder1(reparameterization(z_mean, z_log_var))
