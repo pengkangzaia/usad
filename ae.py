@@ -83,7 +83,7 @@ def training(epochs, model, train_loader, val_loader, opt_func=torch.optim.Adam)
             batch = to_device(batch, device)
 
             # Train AE1
-            loss1, loss2 = model.training_step(batch, epoch + 1)
+            loss1 = model.training_step(batch, epoch + 1)
             loss1.backward()
             optimizer1.step()
             optimizer1.zero_grad()
