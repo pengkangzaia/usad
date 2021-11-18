@@ -150,7 +150,8 @@ class GDriveDL(object):
 
     def process_url(self, url, directory, filename=None):
         id = url_to_id(url)
-        url = url.lower()
+        # 处理数据
+        # url = url.lower()
 
         if "://" not in url:
             with self._request(ITEM_URL.format(id=id)) as resp:
