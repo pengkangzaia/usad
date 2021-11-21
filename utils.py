@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
 
-from sklearn.metrics import roc_curve,roc_auc_score,f1_score,precision_score
+from sklearn.metrics import roc_curve,roc_auc_score,f1_score,classification_report
 
 def get_default_device():
     """Pick GPU if available, else CPU"""
@@ -84,10 +84,19 @@ def confusion_matrix(target, predicted, perc=False):
 
 def max_f1_score(y_test, y_pred):
     res = 0
-    for threshold in range(0, 1000, 1):
-        th = threshold / 1000
-        y_clone = y_pred.copy()
-        y_clone[y_clone >= th] = 1
-        y_clone[y_clone < th] = 0
-        res = max(res, f1_score(y_test, y_clone, average='binary'))
-    return res
+    res_threshold = 0
+    step_times = 1000
+    for threshold in range(0, step_times, 1):
+        th = threshold / step_times * 100
+        y_clone = np.zeros(y_pred.shape[0])
+        y_clone[y_pred >= th] = 1
+        score = f1_score(y_test, y_clone, average='binary')
+        if score > res:
+          res = score
+          res_threshold = th
+          print(classification_report(y_test, y_clone))
+    return res, res_threshold
+
+
+# def down_sample(data, sample_rate):
+#

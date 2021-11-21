@@ -1,6 +1,7 @@
 from usad import *
 import torch.utils.data as data_utils
 from sklearn import preprocessing
+from eval_methods import *
 
 device = get_default_device()
 
@@ -47,7 +48,7 @@ windows_attack = attack.values[np.arange(window_size)[None, :] + np.arange(attac
 ############## training ###################
 # BATCH_SIZE = 7919
 BATCH_SIZE = 19
-N_EPOCHS = 50
+N_EPOCHS = 20
 hidden_size = 100
 
 w_size = windows_normal.shape[1] * windows_normal.shape[2]  # window_size * feature_size
@@ -70,13 +71,13 @@ test_loader = torch.utils.data.DataLoader(data_utils.TensorDataset(
 
 model = UsadModel(w_size, z_size)
 model = to_device(model, device)
-# history = training(N_EPOCHS, model, train_loader, val_loader)
-# plot_history(history)
-# torch.save({
-#     'encoder': model.encoder.state_dict(),
-#     'decoder1': model.decoder1.state_dict(),
-#     'decoder2': model.decoder2.state_dict()
-# }, "model.pth")
+history = training(N_EPOCHS, model, train_loader, val_loader)
+plot_history(history)
+torch.save({
+    'encoder': model.encoder.state_dict(),
+    'decoder1': model.decoder1.state_dict(),
+    'decoder2': model.decoder2.state_dict()
+}, "model.pth")
 
 ############ testing #################
 
@@ -97,4 +98,7 @@ y_test = [1.0 if (np.sum(window) > 0) else 0 for window in windows_labels]
 # 样本太少的话，误差会很大
 y_pred = np.concatenate(
     [torch.stack(results[:-1]).flatten().detach().cpu().numpy(), results[-1].flatten().detach().cpu().numpy()])
+y_pred = (y_pred - y_pred.min()) / (y_pred.max() - y_pred.min())
 threshold = ROC(y_test, y_pred)
+
+t, th = bf_search(y_pred, y_test, start=0, end=1, step_num=1000, display_freq=50)
