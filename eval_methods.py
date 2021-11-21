@@ -44,7 +44,7 @@ def adjust_predicts(score, label,
     label = np.asarray(label)
     latency = 0
     if pred is None:
-        predict = score < threshold
+        predict = score > threshold
     else:
         predict = pred
     actual = label > 0.1
