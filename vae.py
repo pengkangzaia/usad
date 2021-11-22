@@ -75,9 +75,9 @@ class VAE(nn.Module):
         epoch_loss = torch.stack(batch_losses).mean()
         return {'val_loss': epoch_loss.item()}
 
-    def epoch_end(self, epoch, result):
-        print(
-            "Epoch [{}], val_loss: {:.4f}".format(epoch, result['val_loss']))
+    def epoch_end(self, epoch, result, train_loss):
+        print("Epoch [{}], val_loss: {:.4f}, train_loss:{:.4f}".format(epoch, result['val_loss'],
+                                                                       train_loss['train_loss']))
 
 
 def evaluate(model, val_loader, n):
@@ -86,23 +86,27 @@ def evaluate(model, val_loader, n):
 
 
 def training(epochs, model, train_loader, val_loader, opt_func=torch.optim.Adam):
-    history = []
+    val_loss = []
+    train_loss = []
     optimizer = opt_func(list(model.encoder.parameters()) + list(model.decoder.parameters()))
     for epoch in range(epochs):
+        single_train_loss = 0
         for [batch] in train_loader:
             batch = to_device(batch, device)
 
             # Train AE1
             loss = model.training_step(batch, epoch + 1)
+            single_train_loss += loss.item()
             # 更新 AE1
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
 
         result = evaluate(model, val_loader, epoch + 1)
-        model.epoch_end(epoch, result)
-        history.append(result)
-    return history
+        model.epoch_end(epoch, result, single_train_loss)
+        val_loss.append(result)
+        train_loss.append(single_train_loss)
+    return val_loss, train_loss
 
 
 def testing(model, test_loader, alpha=.5, beta=.5):
@@ -112,5 +116,5 @@ def testing(model, test_loader, alpha=.5, beta=.5):
             batch = to_device(batch, device)
             z_mean1, z_log_var1 = model.encoder(batch)
             w1 = model.decoder(reparameterization(z_mean1, z_log_var1))
-            results.append(torch.mean((batch-w1)**2,axis=1))
+            results.append(torch.mean((batch - w1) ** 2, axis=1))
         return results
