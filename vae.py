@@ -76,8 +76,7 @@ class VAE(nn.Module):
         return {'val_loss': epoch_loss.item()}
 
     def epoch_end(self, epoch, result, train_loss):
-        print("Epoch [{}], val_loss: {:.4f}, train_loss:{:.4f}".format(epoch, result['val_loss'],
-                                                                       train_loss['train_loss']))
+        print("Epoch [{}], val_loss: {:.4f}, train_loss:{:.4f}".format(epoch, result['val_loss'], train_loss))
 
 
 def evaluate(model, val_loader, n):
