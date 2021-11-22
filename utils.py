@@ -47,8 +47,7 @@ def plot_simple_history(history):
 
 
 def plot_train_loss(history):
-    losses = [x['train_loss'] for x in history]
-    plt.plot(losses, '-x', label="loss")
+    plt.plot(history, '-x', label="loss")
     plt.xlabel('epoch')
     plt.ylabel('loss')
     plt.legend()
