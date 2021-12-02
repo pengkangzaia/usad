@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 from utils import *
 
@@ -115,5 +114,5 @@ def testing(model, test_loader, alpha=.5, beta=.5):
             batch = to_device(batch, device)
             z_mean1, z_log_var1 = model.encoder(batch)
             w1 = model.decoder(reparameterization(z_mean1, z_log_var1))
-            results.append(torch.mean((batch - w1) ** 2, axis=1))
+            results.append(torch.mean((batch - w1) ** 2, dim=1))
         return results
