@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from utils import *
 
@@ -43,12 +44,16 @@ class LSTMVAE(nn.Module):
         return res
 
     def forward(self, x):
-        encode_h = self.tanh(self.encoder_LSTM(x))
-        mean = self.ReLU(self.z_mean_linear(encode_h[:-1:]))
-        sigma = self.ReLU(self.z_sigma_linear(encode_h))
+        encode_h, (_h, _c) = self.encoder_LSTM(x)
+        encode_h = self.tanh(encode_h)
+        mean = self.ReLU(self.z_mean_linear(encode_h[:, -1, :]))
+        sigma = self.ReLU(self.z_sigma_linear(encode_h[:, -1, :]))
         z = self.reparameterization(mean, sigma)
-        decode_h = self.tanh(self.hidden_LSTM(z))
-        x_hat = self.tanh(self.output_LSTM(decode_h))
+        repeated_z = torch.unsqueeze(z, 1).repeat(1, x.shape[1], 1)
+        decode_h, (_h, _c) = self.hidden_LSTM(repeated_z)
+        decode_h = self.tanh(decode_h)
+        x_hat, (_h, _c) = self.output_LSTM(decode_h)
+        x_hat = self.tanh(x_hat)
         # cache running param
         self.sigma = sigma
         self.mean = mean
@@ -117,6 +122,3 @@ def testing(model, test_loader, alpha=.5, beta=.5):
             w1 = model(batch)
             results.append(torch.mean((batch - w1) ** 2, dim=1))
         return results
-
-
-
