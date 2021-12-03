@@ -120,5 +120,5 @@ def testing(model, test_loader, alpha=.5, beta=.5):
         for [batch] in test_loader:
             batch = to_device(batch, device)
             w1 = model(batch)
-            results.append(torch.mean((batch - w1) ** 2, dim=1))
+            results.append(torch.mean((batch[:, -1, :] - w1[:, -1, :]) ** 2, dim=1))
         return results
