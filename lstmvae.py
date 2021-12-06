@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 from utils import *
 
@@ -114,7 +113,7 @@ def training(epochs, model, train_loader, val_loader, opt_func=torch.optim.Adam)
     return val_loss, train_loss
 
 
-def testing(model, test_loader, alpha=.5, beta=.5):
+def testing(model, test_loader):
     with torch.no_grad():
         results = []
         for [batch] in test_loader:

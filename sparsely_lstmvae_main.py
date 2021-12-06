@@ -1,4 +1,4 @@
-from lstmvae import *
+from sparsely_lstm_vae import *
 import torch.utils.data as data_utils
 from sklearn import preprocessing
 from eval_methods import *
@@ -70,7 +70,7 @@ test_loader = torch.utils.data.DataLoader(data_utils.TensorDataset(
     torch.from_numpy(windows_attack).float().view(([windows_attack.shape[0], windows_attack.shape[1], windows_attack.shape[2]]))
 ), batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
 
-model = LSTMVAE(BATCH_SIZE, window_size, windows_normal.shape[2], hidden_size, latent_size)
+model = SparselyLstmVae(BATCH_SIZE, window_size, windows_normal.shape[2], hidden_size, latent_size, former_step=3)
 model = to_device(model, device)
 
 val_loss, train_loss = training(N_EPOCHS, model, train_loader, val_loader)
