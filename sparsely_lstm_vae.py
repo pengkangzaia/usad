@@ -74,13 +74,13 @@ class SparselyLstmVae(nn.Module):
 
     def init_state(self, input):
         queue = self.former_hidden_state
-        queue[0].append(torch.zeros(self.num_layers, input.shape[0], self.hidden_size))
-        queue[1].append(torch.zeros(self.num_layers, input.shape[0], self.hidden_size))
-        queue[2].append(torch.zeros(self.num_layers, input.shape[0], self.input_size))
+        queue[0].append(torch.zeros(self.num_layers, input.shape[0], self.hidden_size).to(device))
+        queue[1].append(torch.zeros(self.num_layers, input.shape[0], self.hidden_size).to(device))
+        queue[2].append(torch.zeros(self.num_layers, input.shape[0], self.input_size).to(device))
         cell_state = self.cell_state
-        cell_state[0] = torch.zeros(self.num_layers, input.shape[0], self.hidden_size)
-        cell_state[1] = torch.zeros(self.num_layers, input.shape[0], self.hidden_size)
-        cell_state[2] = torch.zeros(self.num_layers, input.shape[0], self.input_size)
+        cell_state[0] = torch.zeros(self.num_layers, input.shape[0], self.hidden_size).to(device)
+        cell_state[1] = torch.zeros(self.num_layers, input.shape[0], self.hidden_size).to(device)
+        cell_state[2] = torch.zeros(self.num_layers, input.shape[0], self.input_size).to(device)
 
     def get_weight_hidden_state(self):
         # 上一时刻的hidden state
