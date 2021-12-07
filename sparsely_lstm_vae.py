@@ -51,7 +51,7 @@ class SparselyLstmVae(nn.Module):
                                    num_layers=num_layers)
 
     def random_weight(self):
-        w_array = [[0, 1], [1, 0], [1, 1]]
+        w_array = [[1, 0], [1, 1]]
         random_idx = random.randint(0, 2)
         return w_array[random_idx][0], w_array[random_idx][1]
 
