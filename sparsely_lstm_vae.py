@@ -52,7 +52,7 @@ class SparselyLstmVae(nn.Module):
 
     def random_weight(self):
         w_array = [[1, 0], [1, 1]]
-        random_idx = random.randint(0, 2)
+        random_idx = random.randint(0, 1)
         return w_array[random_idx][0], w_array[random_idx][1]
 
     # sample from N(0, 1)
