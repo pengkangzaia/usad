@@ -77,6 +77,7 @@ class Encoder(nn.Module):
 
     def forward(self, x):
         self.init_state(x)
+        self.encoder_LSTM.to(device)
         # 获取之前的状态
         h_e = self.get_weight_hidden_state()
         c_e = self.cell_state
