@@ -287,6 +287,6 @@ def testing(model, test_loader):
         results = []
         for [batch] in test_loader:
             batch = to_device(batch, device)
-            w1 = model(batch)
+            w1, loss = model(batch)
             results.append(torch.mean((batch[:, -1, :] - w1[:, -1, :]) ** 2, dim=1))
         return results

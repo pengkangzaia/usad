@@ -7,7 +7,7 @@ device = get_default_device()
 
 # Read data
 # normal = pd.read_csv("input/SWaT_Dataset_Normal_v1.csv")  # , nrows=1000)
-normal = pd.read_csv("input/SWaT_Dataset_Normal_v1.csv", nrows=10000)  # , nrows=1000)
+normal = pd.read_csv("input/SWaT_Dataset_Normal_v1.csv", nrows=1000)  # , nrows=1000)
 normal = normal.drop(["Timestamp", "Normal/Attack"], axis=1)
 # normal.shape
 
@@ -24,7 +24,7 @@ normal = pd.DataFrame(x_scaled)
 
 # Read data
 # attack = pd.read_csv("input/SWaT_Dataset_Attack_v0.csv", sep=";")  # , nrows=1000)
-attack = pd.read_csv("input/SWaT_Dataset_Attack_v0.csv", sep=";", nrows=10000)  # , nrows=1000)
+attack = pd.read_csv("input/SWaT_Dataset_Attack_v0.csv", sep=";", nrows=1000)  # , nrows=1000)
 labels = [float(label != 'Normal') for label in attack["Normal/Attack"].values]
 attack = attack.drop(["Timestamp", "Normal/Attack"], axis=1)
 
@@ -48,7 +48,7 @@ windows_attack = attack.values[np.arange(window_size)[None, :] + np.arange(attac
 ############## training ###################
 # BATCH_SIZE = 7919
 BATCH_SIZE = 200
-N_EPOCHS = 100
+N_EPOCHS = 5
 hidden_size = 100
 latent_size = 40
 
