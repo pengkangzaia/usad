@@ -1,7 +1,6 @@
 import random
 from collections import deque
 
-import torch
 import torch.nn as nn
 
 from utils import *
@@ -65,9 +64,6 @@ class SparselyLstmVae(nn.Module):
         return self.cell_state[0], self.cell_state[1], self.cell_state[2]
 
     def cache_cell_state(self, c_e_new, c_h_new, c_o_new):
-        # self.cell_state[0] = c_e_new
-        # self.cell_state[1] = c_h_new
-        # self.cell_state[2] = c_o_new
         self.cell_state[0] = c_e_new.detach()
         self.cell_state[1] = c_h_new.detach()
         self.cell_state[2] = c_o_new.detach()
