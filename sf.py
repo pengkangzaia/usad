@@ -186,10 +186,10 @@ class SF(nn.Module):
         self.former_step = int(ensemble_size / 4)
         self.num_layers = num_layers
         self.ensemble_size = ensemble_size
-        self.encoders = [Encoder(batch_size, time_step, input_size, hidden_size, z_size, self.former_step, num_layers)
-                         for _ in range(ensemble_size)]
-        self.decoders = [Decoder(batch_size, time_step, input_size, hidden_size, z_size, self.former_step, num_layers)
-                         for _ in range(ensemble_size)]
+        self.encoders = nn.ModuleList([Encoder(batch_size, time_step, input_size, hidden_size, z_size, self.former_step,
+                                               num_layers) for _ in range(ensemble_size)])
+        self.decoders = nn.ModuleList([Decoder(batch_size, time_step, input_size, hidden_size, z_size, self.former_step,
+                                               num_layers) for _ in range(ensemble_size)])
 
     def forward(self, x):
         z_list = []
@@ -227,7 +227,6 @@ class SF(nn.Module):
     # validation
     def validation_step(self, input, n):
         with torch.no_grad():
-            self.init_state(input)
             input_hat, recon_loss = self.forward(input)
             return {'val_loss': recon_loss}
 
@@ -249,11 +248,11 @@ class SF(nn.Module):
             res += list(i.parameters())
         return res
 
-    def to_cuda(self):
+    def to_local_device(self):
         for encoder in self.encoders:
-            encoder.cuda()
+            encoder.to(device)
         for decoder in self.decoders:
-            decoder.cuda()
+            decoder.to(device)
 
 
 def training(epochs, model, train_loader, val_loader, opt_func=torch.optim.Adam):
@@ -288,7 +287,6 @@ def testing(model, test_loader):
         results = []
         for [batch] in test_loader:
             batch = to_device(batch, device)
-            model.init_state(batch)
             w1 = model(batch)
             results.append(torch.mean((batch[:, -1, :] - w1[:, -1, :]) ** 2, dim=1))
         return results

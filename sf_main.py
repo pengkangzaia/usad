@@ -72,7 +72,7 @@ test_loader = torch.utils.data.DataLoader(data_utils.TensorDataset(
 
 model = SF(BATCH_SIZE, window_size, windows_normal.shape[2], hidden_size, latent_size, ensemble_size=window_size)
 # model = to_device(model, device)
-model.to_cuda()
+model.to_local_device()
 
 val_loss, train_loss = training(N_EPOCHS, model, train_loader, val_loader)
 plot_simple_history(val_loss)
