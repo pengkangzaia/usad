@@ -248,6 +248,12 @@ class SF(nn.Module):
             res += list(i.parameters())
         return res
 
+    def to_cuda(self):
+        for encoder in self.encoders:
+            encoder.cuda()
+        for decoder in self.decoders:
+            decoder.cuda()
+
 
 def training(epochs, model, train_loader, val_loader, opt_func=torch.optim.Adam):
     val_loss = []
