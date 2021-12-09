@@ -1,13 +1,13 @@
-from usad import *
+from model.usad import *
 import torch.utils.data as data_utils
 from sklearn import preprocessing
-from eval_methods import *
+from utils.eval_methods import *
 
 device = get_default_device()
 
 # Read data
-# normal = pd.read_csv("input/SWaT_Dataset_Normal_v1.csv")  # , nrows=1000)
-normal = pd.read_csv("input/SWaT_Dataset_Normal_v1.csv", nrows=1000)  # , nrows=1000)
+# normal = pd.read_csv("data/SWaT_Dataset_Normal_v1.csv")  # , nrows=1000)
+normal = pd.read_csv("data/SWaT/SWaT_Dataset_Normal_v1.csv", nrows=1000)  # , nrows=1000)
 normal = normal.drop(["Timestamp", "Normal/Attack"], axis=1)
 # normal.shape
 
@@ -23,8 +23,8 @@ x_scaled = min_max_scaler.fit_transform(x)
 normal = pd.DataFrame(x_scaled)
 
 # Read data
-# attack = pd.read_csv("input/SWaT_Dataset_Attack_v0.csv", sep=";")  # , nrows=1000)
-attack = pd.read_csv("input/SWaT_Dataset_Attack_v0.csv", sep=";", nrows=1000)  # , nrows=1000)
+# attack = pd.read_csv("data/SWaT_Dataset_Attack_v0.csv", sep=";")  # , nrows=1000)
+attack = pd.read_csv("data/SWaT/SWaT_Dataset_Attack_v0.csv", sep=";", nrows=1000)  # , nrows=1000)
 labels = [float(label != 'Normal') for label in attack["Normal/Attack"].values]
 attack = attack.drop(["Timestamp", "Normal/Attack"], axis=1)
 
@@ -77,7 +77,7 @@ torch.save({
     'encoder': model.encoder.state_dict(),
     'decoder1': model.decoder1.state_dict(),
     'decoder2': model.decoder2.state_dict()
-}, "model.pth")
+}, "saved_model/model.pth")
 
 ############ testing #################
 

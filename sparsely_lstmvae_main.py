@@ -1,13 +1,13 @@
-from sparsely_lstm_vae import *
+from model.sparsely_lstm_vae import *
 import torch.utils.data as data_utils
 from sklearn import preprocessing
-from eval_methods import *
+from utils.eval_methods import *
 
 device = get_default_device()
 
 # Read data
-# normal = pd.read_csv("input/SWaT_Dataset_Normal_v1.csv")  # , nrows=1000)
-normal = pd.read_csv("input/SWaT_Dataset_Normal_v1.csv", nrows=10000)  # , nrows=1000)
+# normal = pd.read_csv("data/SWaT_Dataset_Normal_v1.csv")  # , nrows=1000)
+normal = pd.read_csv("data/SWaT/SWaT_Dataset_Normal_v1.csv", nrows=10000)  # , nrows=1000)
 normal = normal.drop(["Timestamp", "Normal/Attack"], axis=1)
 # normal.shape
 
@@ -23,8 +23,8 @@ x_scaled = min_max_scaler.fit_transform(x)
 normal = pd.DataFrame(x_scaled)
 
 # Read data
-# attack = pd.read_csv("input/SWaT_Dataset_Attack_v0.csv", sep=";")  # , nrows=1000)
-attack = pd.read_csv("input/SWaT_Dataset_Attack_v0.csv", sep=";", nrows=10000)  # , nrows=1000)
+# attack = pd.read_csv("data/SWaT_Dataset_Attack_v0.csv", sep=";")  # , nrows=1000)
+attack = pd.read_csv("data/SWaT/SWaT_Dataset_Attack_v0.csv", sep=";", nrows=10000)  # , nrows=1000)
 labels = [float(label != 'Normal') for label in attack["Normal/Attack"].values]
 attack = attack.drop(["Timestamp", "Normal/Attack"], axis=1)
 
@@ -76,7 +76,7 @@ model = to_device(model, device)
 val_loss, train_loss = training(N_EPOCHS, model, train_loader, val_loader)
 plot_simple_history(val_loss)
 plot_train_loss(train_loss)
-torch.save({'ae': model.state_dict()}, "model.pth")
+torch.save({'ae': model.state_dict()}, "saved_model/model.pth")
 
 ############ testing #################
 
