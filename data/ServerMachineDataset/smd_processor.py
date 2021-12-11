@@ -10,7 +10,7 @@ class SMD:
     def __init__(self, entity_id, batch_size, window_size=12):
         # Read data
         train_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'train/machine-' + entity_id + '.txt')
-        test_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'train/machine-' + entity_id + '.txt')
+        test_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test/machine-' + entity_id + '.txt')
         label_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_label/machine-' + entity_id + '.txt')
         normal = pd.read_csv(train_path, sep=",", header=None)
         # Transform all columns into float64
