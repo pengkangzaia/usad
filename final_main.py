@@ -5,6 +5,8 @@ from utils.eval_methods import *
 from data.SWaT.swat_processor import *
 from data.ServerMachineDataset.smd_processor import *
 from model.lstmvae import *
+from model.statefulsf import *
+from model.ae import *
 
 device = get_default_device()
 
@@ -34,10 +36,11 @@ def smd_cal_all():
         train_loader, val_loader, test_loader = smd_data.get_dataloader()
         labels = smd_data.attack_labels
 
-        model = StatefulSf(BATCH_SIZE, window_size, smd_data.input_feature_dim, hidden_size, latent_size,
-                           ensemble_size=window_size)
-        # model = to_device(model, device)
-        model.to_local_device()
+        # model = StatefulSf(BATCH_SIZE, window_size, smd_data.input_feature_dim, hidden_size, latent_size,
+        #                    ensemble_size=window_size)
+        # model = LSTMVAE(BATCH_SIZE, window_size, smd_data.input_feature_dim, hidden_size, latent_size)
+        model = AE(window_size * smd_data.input_feature_dim, window_size * latent_size)
+        model = to_device(model, device)
 
         val_loss, train_loss = training(N_EPOCHS, model, train_loader, val_loader)
         plot_simple_history(val_loss)
@@ -80,4 +83,4 @@ print(np.mean(np.array(best_f1s)))
 
 
 
-t, th = bf_search(y_pred, y_test, start=0, end=1, step_num=1000, display_freq=50)
+# t, th = bf_search(y_pred, y_test, start=0, end=1, step_num=1000, display_freq=50)
