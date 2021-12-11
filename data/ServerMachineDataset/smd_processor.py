@@ -6,19 +6,14 @@ import torch
 import os
 
 
-class SWaT:
-    def __init__(self, batch_size, window_size=12, read_rows=None):
+class SMD:
+    def __init__(self, entity_id, batch_size, window_size=12):
         # Read data
-        normal_data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'SWaT_Dataset_Normal_v1.csv')
-        attack_data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'SWaT_Dataset_Attack_v0.csv')
-        if read_rows is None:
-            normal = pd.read_csv(normal_data_path)
-        else:
-            normal = pd.read_csv(normal_data_path, nrows=read_rows)
-        normal = normal.drop(["Timestamp", "Normal/Attack"], axis=1)
+        train_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'train/machine-' + entity_id + '.txt')
+        test_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'train/machine-' + entity_id + '.txt')
+        label_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_label/machine-' + entity_id + '.txt')
+        normal = pd.read_csv(train_path, sep=",", header=None)
         # Transform all columns into float64
-        for i in list(normal):
-            normal[i] = normal[i].apply(lambda x: str(x).replace(",", "."))
         normal = normal.astype(float)
 
         # 数据预处理
@@ -28,16 +23,9 @@ class SWaT:
         normal = pd.DataFrame(x_scaled)
 
         # Read data
-        if read_rows is None:
-            attack = pd.read_csv(attack_data_path, sep=";")
-        else:
-            attack = pd.read_csv(attack_data_path, sep=";", nrows=read_rows)
-        self.attack_labels = [float(label != 'Normal') for label in attack["Normal/Attack"].values]
-        attack = attack.drop(["Timestamp", "Normal/Attack"], axis=1)
-
+        attack = pd.read_csv(test_path, sep=",", header=None)
+        self.attack_labels = pd.read_csv(label_path, sep=",", header=None)[0].tolist()
         # Transform all columns into float64
-        for i in list(attack):
-            attack[i] = attack[i].apply(lambda x: str(x).replace(",", "."))
         attack = attack.astype(float)
 
         x = attack.values
@@ -73,7 +61,7 @@ class SWaT:
                 ([windows_attack.shape[0], windows_attack.shape[1], windows_attack.shape[2]]))
         ), batch_size=batch_size, shuffle=False, num_workers=0)
 
-        self.input_feature_dim = windows_normal.shape[2]
+        self.input_feature_dim = normal.shape[1]
         self.window_size = window_size
 
     def get_dataloader(self):

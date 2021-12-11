@@ -7,7 +7,7 @@ device = get_default_device()
 
 # Read data
 # normal = pd.read_csv("data/SWaT_Dataset_Normal_v1.csv")  # , nrows=1000)
-normal = pd.read_csv("data/SWaT/SWaT_Dataset_Normal_v1.csv", nrows=10000)  # , nrows=1000)
+normal = pd.read_csv("data/SWaT/SWaT_Dataset_Normal_v1.csv", nrows=100)  # , nrows=1000)
 normal = normal.drop(["Timestamp", "Normal/Attack"], axis=1)
 # normal.shape
 
