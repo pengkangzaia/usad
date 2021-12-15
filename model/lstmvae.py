@@ -44,15 +44,15 @@ class LSTMVAE(nn.Module):
 
     def forward(self, x):
         encode_h, (_h, _c) = self.encoder_LSTM(x)
-        # encode_h = self.tanh(encode_h)
+        encode_h = self.tanh(encode_h)
         mean = self.ReLU(self.z_mean_linear(encode_h[:, -1, :]))
         sigma = self.ReLU(self.z_sigma_linear(encode_h[:, -1, :]))
         z = self.reparameterization(mean, sigma)
         repeated_z = torch.unsqueeze(z, 1).repeat(1, x.shape[1], 1)
         decode_h, (_h, _c) = self.hidden_LSTM(repeated_z)
-        # decode_h = self.tanh(decode_h)
+        decode_h = self.tanh(decode_h)
         x_hat, (_h, _c) = self.output_LSTM(decode_h)
-        # x_hat = self.tanh(x_hat)
+        x_hat = self.tanh(x_hat)
         # cache running param
         self.sigma = sigma
         self.mean = mean
