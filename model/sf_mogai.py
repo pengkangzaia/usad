@@ -1,6 +1,7 @@
 import random
 from collections import deque
 
+import numpy as np
 import torch.nn as nn
 
 from utils.utils import *
@@ -46,53 +47,18 @@ class Encoder(nn.Module):
         self.z_mean_linear = nn.Linear(in_features=hidden_size, out_features=z_size)
         self.z_sigma_linear = nn.Linear(in_features=hidden_size, out_features=z_size)
 
-    def get_weight_hidden_state(self):
-        # 上一时刻的hidden state
-        queue = self.former_hidden_state
-        step = self.former_step
-        if len(queue) < step:
-            return queue[-1]
-        else:
-            # 获取前L个时刻的hidden_state
-            w1, w2 = random_weight()
-            if queue[-1].shape == queue[-step].shape:
-                res = (w1 * queue[-1] + w2 * queue[-step]) / (w1 + w2)
-            else:
-                res = queue[-1]
-            return res
-
-    def update_hidden_state(self, h_e_new):
-        queue = self.former_hidden_state
-        queue.append(h_e_new.detach())
-        # 超过指定大小的hidden state及时删除
-        while len(queue) > self.former_step:
-            queue.popleft()
-
-    def init_state(self, x):
-        queue = self.former_hidden_state
-        queue.append(torch.zeros(self.num_layers, x.shape[0], self.hidden_size).to(device))
-        self.cell_state = torch.zeros(self.num_layers, x.shape[0], self.hidden_size).to(device)
-
-
     def forward(self, x):
-        self.init_state(x)
         self.encoder_LSTM.to(device)
-        # 获取之前的状态
-        h_e = self.get_weight_hidden_state()
-        c_e = self.cell_state
-        encode_h, (h_e_new, c_e_new) = self.encoder_LSTM(x, (h_e, c_e))
+        encode_h, (_h, _c) = self.encoder_LSTM(x)
         encode_h = self.tanh(encode_h)
-        mean = self.ReLU(self.z_mean_linear(encode_h[:, -1, :]))
-        sigma = self.ReLU(self.z_sigma_linear(encode_h[:, -1, :]))
+        mean = self.ReLU(self.z_mean_linear(encode_h))
+        sigma = self.ReLU(self.z_sigma_linear(encode_h))
         z = reparameterization(mean, sigma)
-        # update hidden state and cache cell state
-        self.update_hidden_state(h_e_new)
-        self.cell_state = c_e_new.detach()
         return z, mean, sigma
 
 
 class Decoder(nn.Module):
-    def __init__(self, batch_size, time_step, input_size, hidden_size, z_size, former_step, num_layers):
+    def __init__(self, batch_size, time_step, input_size, hidden_size, z_size, former_step, num_layers, ensemble_size):
         super(Decoder, self).__init__()
         self.batch_size = batch_size
         self.time_step = time_step
@@ -106,73 +72,23 @@ class Decoder(nn.Module):
         self.ReLU = nn.ReLU(inplace=True)
         self.sigmoid = nn.Sigmoid()
         self.tanh = nn.Tanh()
+        self.ensemble_size = ensemble_size
         # decoder
         # LSTM: mapping z space to hidden space
-        self.hidden_LSTM = nn.LSTM(input_size=z_size, hidden_size=hidden_size, batch_first=True, num_layers=num_layers)
+        self.hidden_LSTM = nn.LSTM(input_size=z_size * ensemble_size, hidden_size=hidden_size, batch_first=True, num_layers=num_layers)
         self.output_LSTM = nn.LSTM(input_size=hidden_size, hidden_size=input_size, batch_first=True,
                                    num_layers=num_layers)
 
-    def get_weight_hidden_state(self):
-        # 上一时刻的hidden state
-        queue = self.former_hidden_state
-        step = self.former_step
-        if len(queue[0]) < step:
-            return queue[0][-1], queue[1][-1]
-        else:
-            # 获取前L个时刻的hidden_state
-            w1, w2 = random_weight()
-            result = []
-            for i in range(2):
-                if queue[i][-1].shape == queue[i][-step].shape:
-                    res = (w1 * queue[i][-1] + w2 * queue[i][-step]) / (w1 + w2)
-                else:
-                    res = queue[i][-1]
-                result.append(res)
-            return result
-
-    def get_previous_cell_state(self):
-        return self.cell_state[0], self.cell_state[1]
-
-    def cache_cell_state(self, c_h_new, c_o_new):
-        self.cell_state[0] = c_h_new.detach()
-        self.cell_state[1] = c_o_new.detach()
-
-    def update_hidden_state(self, h_h_new, h_o_new):
-        queue = self.former_hidden_state
-        queue[0].append(h_h_new.detach())
-        queue[1].append(h_o_new.detach())
-        # 超过指定大小的hidden state及时删除
-        while len(queue[0]) > self.former_step:
-            for i in range(2):
-                queue[i].popleft()
-
-    def init_state(self, x):
-        queue = self.former_hidden_state
-        queue[0].append(torch.zeros(self.num_layers, x.shape[0], self.hidden_size).to(device))
-        queue[1].append(torch.zeros(self.num_layers, x.shape[0], self.input_size).to(device))
-        cell_state = self.cell_state
-        cell_state[0] = torch.zeros(self.num_layers, x.shape[0], self.hidden_size).to(device)
-        cell_state[1] = torch.zeros(self.num_layers, x.shape[0], self.input_size).to(device)
-
-
     def forward(self, concatenate_z):
-        self.init_state(concatenate_z)
-        # 获取之前的状态
-        h_h, h_o = self.get_weight_hidden_state()
-        c_h, c_o = self.get_previous_cell_state()
-        decode_h, (h_h_new, c_h_new) = self.hidden_LSTM(concatenate_z, (h_h, c_h))
+        decode_h, (_h, _c) = self.hidden_LSTM(concatenate_z)
         decode_h = self.tanh(decode_h)
-        x_hat, (h_o_new, c_o_new) = self.output_LSTM(decode_h, (h_o, c_o))
+        x_hat, (_h, _c) = self.output_LSTM(decode_h)
         x_hat = self.tanh(x_hat)
-        # update hidden state and cache cell state
-        self.update_hidden_state(h_h_new, h_o_new)
-        self.cache_cell_state(c_h_new, c_o_new)
         return x_hat
 
 
 class SF(nn.Module):
-    def __init__(self, batch_size, time_step, input_size, hidden_size, z_size, num_layers=1,
-                 ensemble_size=40):
+    def __init__(self, batch_size, time_step, input_size, hidden_size, z_size, num_layers=1, ensemble_size=4):
         super().__init__()
 
         # init param
@@ -188,27 +104,31 @@ class SF(nn.Module):
         self.encoders = nn.ModuleList([Encoder(batch_size, time_step, input_size, hidden_size, z_size, self.former_step,
                                                num_layers) for _ in range(ensemble_size)])
         self.decoders = nn.ModuleList([Decoder(batch_size, time_step, input_size, hidden_size, z_size, self.former_step,
-                                               num_layers) for _ in range(1)])
+                                               num_layers, ensemble_size) for _ in range(1)])
 
     def forward(self, x):
         z_list = []
         mean_list = []
         log_var_list = []
+        a, b, c = 0, 0, 0
         for i in range(self.ensemble_size):
             z, mean, log_var = self.encoders[i](x)
-            z_list.append(torch.unsqueeze(z, dim=1))
+            a, b, c = z.shape
+            z_list.append(torch.unsqueeze(z, dim=3))
             mean_list.append(mean)
             log_var_list.append(log_var)
-        z_res = torch.cat(z_list, dim=1)
+        z_res = torch.cat(z_list, dim=3)
+        z_res = z_res.view(a, b, -1)
         o_list = []
-        o_list.append(self.decoders[0](z_res))
-        # o_temp = [torch.unsqueeze(i, dim=3) for i in o_list]
-        # o_res, _ = torch.median(torch.cat(o_temp, dim=3), dim=3)
+        for i in range(self.ensemble_size):
+            o_list.append(self.decoders[0](z_res))
+        o_temp = [torch.unsqueeze(i, dim=3) for i in o_list]
+        o_res, _ = torch.median(torch.cat(o_temp, dim=3), dim=3)
         # 计算loss
         loss = 0
         for i in range(self.ensemble_size):
-            loss += self.loss_function(x, o_list[0], mean_list[i], log_var_list[i])
-        return o_list[0], loss
+            loss += self.loss_function(x, o_list[i], mean_list[i], log_var_list[i])
+        return o_res, loss
 
     # loss function
     def loss_function(self, origin, reconstruction, mean, log_var):
