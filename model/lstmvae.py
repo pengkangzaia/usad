@@ -94,7 +94,7 @@ def evaluate(model, val_loader, n):
 def training(epochs, model, train_loader, val_loader, opt_func=torch.optim.Adam):
     val_loss = []
     train_loss = []
-    optimizer = opt_func(list(model.parameters()))
+    optimizer = opt_func(params=list(model.parameters()), lr=1e-4)
     for epoch in range(epochs):
         single_train_loss = 0
         for [batch] in train_loader:
