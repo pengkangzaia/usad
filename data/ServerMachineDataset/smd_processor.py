@@ -19,7 +19,6 @@ class SMD:
 
         # 数据预处理
         min_max_scaler = preprocessing.MinMaxScaler()
-        min_max_scaler = preprocessing.StandardScaler()
         x = normal.values
         x_scaled = min_max_scaler.fit_transform(x)
         normal = pd.DataFrame(x_scaled)
@@ -83,7 +82,6 @@ class SmdAe:
 
         # 数据预处理
         min_max_scaler = preprocessing.MinMaxScaler()
-        min_max_scaler = preprocessing.StandardScaler()
         x = normal.values
         x_scaled = min_max_scaler.fit_transform(x)
         normal = pd.DataFrame(x_scaled)
