@@ -85,8 +85,10 @@ class Encoder(nn.Module):
         c_e = self.cell_state
         encode_h, (h_e_new, c_e_new) = self.encoder_LSTM(x, (h_e, c_e))
         encode_h = self.tanh(encode_h)
-        mean = self.ReLU(self.z_mean_linear(encode_h[:, -1, :]))
-        sigma = self.ReLU(self.z_sigma_linear(encode_h[:, -1, :]))
+        mean = self.ReLU(self.z_mean_linear(encode_h))
+        # mean = self.ReLU(self.z_mean_linear(encode_h[:, -1, :]))
+        # sigma = self.ReLU(self.z_sigma_linear(encode_h[:, -1, :]))
+        sigma = self.ReLU(self.z_sigma_linear(encode_h))
         z = re_parameterization(mean, sigma)
         # update hidden state and cache cell state
         self.update_hidden_state(h_e_new)
@@ -95,7 +97,7 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, batch_size, time_step, input_size, hidden_size, z_size, former_step, num_layers):
+    def __init__(self, batch_size, time_step, input_size, hidden_size, z_size, former_step, num_layers, ensemble_size):
         super(Decoder, self).__init__()
         self.batch_size = batch_size
         self.time_step = time_step
@@ -109,9 +111,10 @@ class Decoder(nn.Module):
         self.ReLU = nn.ReLU(inplace=True)
         self.sigmoid = nn.Sigmoid()
         self.tanh = nn.Tanh()
+        self.ensemble_size = ensemble_size
         # decoder
         # LSTM: mapping z space to hidden space
-        self.hidden_LSTM = nn.LSTM(input_size=z_size, hidden_size=hidden_size, batch_first=True, num_layers=num_layers)
+        self.hidden_LSTM = nn.LSTM(input_size=z_size * ensemble_size, hidden_size=hidden_size, batch_first=True, num_layers=num_layers)
         self.output_LSTM = nn.LSTM(input_size=hidden_size, hidden_size=input_size, batch_first=True,
                                    num_layers=num_layers)
 
@@ -179,7 +182,7 @@ class Decoder(nn.Module):
 
 
 class StatefulSfLinear(nn.Module):
-    def __init__(self, batch_size, time_step, input_size, hidden_size, z_size, num_layers=1,
+    def __init__(self, batch_size, time_step, input_size, hidden_size, z_size, num_layers=2,
                  ensemble_size=40):
         super().__init__()
 
@@ -196,20 +199,23 @@ class StatefulSfLinear(nn.Module):
         self.encoders = nn.ModuleList([Encoder(batch_size, time_step, input_size, hidden_size, z_size, self.former_step,
                                                num_layers) for _ in range(ensemble_size)])
         self.decoders = nn.ModuleList([Decoder(batch_size, time_step, input_size, hidden_size, z_size, self.former_step,
-                                               num_layers) for _ in range(ensemble_size)])
-        self.linears = nn.ModuleList([nn.Linear(z_size, z_size) for _ in range(ensemble_size)])
+                                               num_layers, ensemble_size) for _ in range(ensemble_size)])
+        # self.linears = nn.ModuleList([nn.Linear(z_size, z_size) for _ in range(ensemble_size)])
 
     def forward(self, x, batch_idx):
         z_list = []
         mean_list = []
         log_var_list = []
+        a, b, c = None, None, None
         for i in range(self.ensemble_size):
             z, mean, log_var = self.encoders[i](x, batch_idx)
-            z = self.linears[i](z)
-            z_list.append(torch.unsqueeze(z, dim=1))
+            # z = self.linears[i](z)
+            a, b, c = z.shape
+            z_list.append(torch.unsqueeze(z, dim=3))
             mean_list.append(mean)
             log_var_list.append(log_var)
-        z_res = torch.cat(z_list, dim=1)
+        z_res = torch.cat(z_list, dim=3)
+        z_res = z_res.view(a, b, -1)
         o_list = []
         for i in range(self.ensemble_size):
             o_list.append(self.decoders[i](z_res, batch_idx))
