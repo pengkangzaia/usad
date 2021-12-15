@@ -53,7 +53,7 @@ class LSTMVAE(nn.Module):
         decode_h, (_h, _c) = self.hidden_LSTM(z)
         decode_h = self.tanh(decode_h)
         x_hat, (_h, _c) = self.output_LSTM(decode_h)
-        x_hat = self.tanh(x_hat)
+        # x_hat = self.tanh(x_hat)
         # cache running param
         self.sigma = sigma
         self.mean = mean
