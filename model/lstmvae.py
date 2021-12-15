@@ -26,15 +26,15 @@ class LSTMVAE(nn.Module):
 
         # encoder
         # LSTM: mapping data to hidden space
-        self.encoder_LSTM = nn.LSTM(input_size=input_size, hidden_size=hidden_size, batch_first=True, num_layers=3)
+        self.encoder_LSTM = nn.LSTM(input_size=input_size, hidden_size=hidden_size, batch_first=True, num_layers=2)
         # liner layer: mapping hidden space to μ and σ
         self.z_mean_linear = nn.Linear(in_features=hidden_size, out_features=z_size)
         self.z_sigma_linear = nn.Linear(in_features=hidden_size, out_features=z_size)
 
         # decoder
         # LSTM: mapping z space to hidden space
-        self.hidden_LSTM = nn.LSTM(input_size=z_size, hidden_size=hidden_size, batch_first=True, num_layers=3)
-        self.output_LSTM = nn.LSTM(input_size=hidden_size, hidden_size=input_size, batch_first=True, num_layers=3)
+        self.hidden_LSTM = nn.LSTM(input_size=z_size, hidden_size=hidden_size, batch_first=True, num_layers=2)
+        self.output_LSTM = nn.LSTM(input_size=hidden_size, hidden_size=input_size, batch_first=True, num_layers=2)
 
     # sample from N(0, 1)
     def reparameterization(self, z_mean, z_sigma):
