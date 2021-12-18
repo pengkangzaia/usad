@@ -36,6 +36,7 @@ class Decoder(nn.Module):
         )
         self.out = nn.Linear(int(latent_dim * (2 ** depth)), int(output_shape))
         self.ReLU = nn.ReLU(inplace=True)
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, input):
         x = self.hidden[0](input)
@@ -43,7 +44,7 @@ class Decoder(nn.Module):
             x = self.hidden[i](x)
             x = self.ReLU(x)
         x = self.out(x)
-        x = self.ReLU(x)
+        x = self.sigmoid(x)
         return x
 
 
