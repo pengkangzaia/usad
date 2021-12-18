@@ -6,14 +6,14 @@ device = get_default_device()
 
 
 class Encoder(nn.Module):
-    def __init__(self, input_shape, latent_dim: int, depth: int = 2):
+    def __init__(self, input_shape: int, latent_dim: int, depth: int = 2):
         super(Encoder, self).__init__()
         self.latent_dim = latent_dim
         self.depth = depth
         self.hidden = nn.ModuleList(
-            [nn.Linear(int(input_shape[-1] / (2 ** i)), int(input_shape[-1] / (2 ** (i + 1)))) for i in range(depth)]
+            [nn.Linear(int(input_shape / (2 ** i)), int(input_shape / (2 ** (i + 1)))) for i in range(depth)]
         )
-        self.latent = nn.Linear(int(input_shape[-1] / (2 ** depth)), latent_dim)
+        self.latent = nn.Linear(int(input_shape / (2 ** depth)), latent_dim)
         self.ReLU = nn.ReLU(inplace=True)
 
     def forward(self, input):
@@ -34,7 +34,7 @@ class Decoder(nn.Module):
         self.hidden = nn.ModuleList(
             [nn.Linear(int(latent_dim * (2 ** i)), int(latent_dim * (2 ** (i + 1)))) for i in range(depth)]
         )
-        self.out = nn.Linear(int(latent_dim * (2 ** depth)), int(output_shape[-1]))
+        self.out = nn.Linear(int(latent_dim * (2 ** depth)), int(output_shape))
         self.ReLU = nn.ReLU(inplace=True)
 
     def forward(self, input):
@@ -48,25 +48,25 @@ class Decoder(nn.Module):
 
 
 class BaggingAE(nn.Module):
-    def __init__(self, input_shape, n_estimators: int = 100, max_features: int = 3, encoding_depth: int = 2,
+    def __init__(self, input_dim, n_estimators: int = 100, max_features: int = 3, encoding_depth: int = 2,
                  latent_dim: int = 2, decoding_depth: int = 2):
         super(BaggingAE, self).__init__()
-        self.input_shape = input_shape
+        self.input_dim = input_dim
         self.n_estimators = n_estimators
         self.max_features = max_features
         self.encoding_depth = encoding_depth
         self.latent_dim = latent_dim
         self.decoding_depth = decoding_depth
         self.encoders = nn.ModuleList(
-            [Encoder(self.input_shape, self.latent_dim, self.encoding_depth) for _ in range(self.n_estimators)]
+            [Encoder(self.max_features, self.latent_dim, self.encoding_depth) for _ in range(self.n_estimators)]
         )
         self.decoders = nn.ModuleList(
-            [Decoder(self.input_shape, self.latent_dim, self.decoding_depth) for _ in range(self.n_estimators)]
+            [Decoder(self.input_dim, self.latent_dim, self.decoding_depth) for _ in range(self.n_estimators)]
         )
         # the feature selector (bootstrapping)
         self.random_samples = np.concatenate(
             [
-                np.random.choice(input_shape[-1], replace=False, size=(1, self.max_features)) for _
+                np.random.choice(input_dim, replace=False, size=(1, self.max_features)) for _
                 in range(self.n_estimators)
             ]
         )

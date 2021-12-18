@@ -41,8 +41,8 @@ def smd_cal_all():
         #            ensemble_size=4)
         # model = LSTMVAE(BATCH_SIZE, window_size, smd_data.input_feature_dim, hidden_size, latent_size)
         # model = AE(window_size * smd_data.input_feature_dim, window_size * latent_size)
-        input_shape = [5]
-        model = BaggingAE(input_shape=input_shape, n_estimators=5, max_features=5, encoding_depth=2, decoding_depth=3, latent_dim=4)
+        input_shape = smd_data.input_feature_dim
+        model = BaggingAE(input_dim=input_shape, n_estimators=7, max_features=5, encoding_depth=2, decoding_depth=3, latent_dim=4)
         # model = UsadModel(window_size * smd_data.input_feature_dim, window_size * latent_size)
         # model = SF(BATCH_SIZE, window_size,smd_data.input_feature_dim, hidden_size, latent_size, num_layers=2, ensemble_size=4)
         model = to_device(model, device)
