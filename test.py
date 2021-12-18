@@ -14,6 +14,21 @@ import torch
 # torch.cat(a, out=b, dim=1)
 # a = torch.randn(4, 4, 4)
 # b, c = torch.median(a, 1)
-print(int(40 / 7))
+# print(int(40 / 7))
 
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+import torch
+import torch.nn as nn
+from torch.autograd import Variable
+from sklearn.preprocessing import MinMaxScaler
+
+a = torch.randn([2, 4])
+# idx = [3, 1,2,0]
+# # torch.gather(a, dim=1, index=torch.tensor())
+# b = a[:,idx]
+b = torch.unsqueeze(a, dim=0)
+c = torch.unsqueeze(a, dim=0)
+d = torch.cat([b,c])
 pass

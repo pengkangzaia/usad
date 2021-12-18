@@ -1,12 +1,11 @@
 import numpy as np
 
-from model.statefulsf import *
 from utils.eval_methods import *
 from data.SWaT.swat_processor import *
 from data.ServerMachineDataset.smd_processor import *
-from model.lstmvae import *
-from model.statefulsf import *
-from model.ae import *
+# from model.statefulsf_mogai import *
+# from model.ae import *
+from model.bagging_ae import *
 
 device = get_default_device()
 
@@ -18,6 +17,7 @@ hidden_size = 60
 latent_size = 30
 window_size = 12
 
+
 # w_size = windows_normal.shape[1] * windows_normal.shape[2]  # window_size * feature_size
 # z_size = windows_normal.shape[1] * hidden_size  # window_size * hidden_size
 
@@ -27,24 +27,29 @@ window_size = 12
 
 
 def smd_cal_all():
-    entity_ids = ["1-1", "1-2", "1-3", "1-4", "1-5", "1-6", "1-7", "1-8",
-                  "2-1", "2-2", "2-3", "2-4", "2-5", "2-6", "2-7", "2-8", "2-9",
-                  "3-1", "3-2", "3-3", "3-4", "3-5", "3-6", "3-7", "3-8", "3-9", "3-10", "3-11"]
-    best_f1s =[]
+    # entity_ids = ["1-1", "1-2", "1-3", "1-4", "1-5", "1-6", "1-7", "1-8",
+    #               "2-1", "2-2", "2-3", "2-4", "2-5", "2-6", "2-7", "2-8", "2-9",
+    #               "3-1", "3-2", "3-3", "3-4", "3-5", "3-6", "3-7", "3-8", "3-9", "3-10", "3-11"]
+    entity_ids = ["1-1", "1-2"]
+    best_f1s = []
     for entity_id in entity_ids:
-        smd_data = SMD(entity_id=entity_id, batch_size=BATCH_SIZE, window_size=window_size)
+        smd_data = SmdAe(entity_id=entity_id, batch_size=BATCH_SIZE, window_size=window_size)
         train_loader, val_loader, test_loader = smd_data.get_dataloader()
         labels = smd_data.attack_labels
 
-        # model = StatefulSf(BATCH_SIZE, window_size, smd_data.input_feature_dim, hidden_size, latent_size,
-        #                    ensemble_size=window_size)
+        # model = StatefulSfLinear(BATCH_SIZE, window_size, smd_data.input_feature_dim, hidden_size, latent_size,
+        #            ensemble_size=4)
         # model = LSTMVAE(BATCH_SIZE, window_size, smd_data.input_feature_dim, hidden_size, latent_size)
-        model = AE(window_size * smd_data.input_feature_dim, window_size * latent_size)
+        # model = AE(window_size * smd_data.input_feature_dim, window_size * latent_size)
+        input_shape = [5]
+        model = BaggingAE(input_shape=input_shape, n_estimators=5, max_features=5, encoding_depth=2, decoding_depth=3, latent_dim=4)
+        # model = UsadModel(window_size * smd_data.input_feature_dim, window_size * latent_size)
+        # model = SF(BATCH_SIZE, window_size,smd_data.input_feature_dim, hidden_size, latent_size, num_layers=2, ensemble_size=4)
         model = to_device(model, device)
 
-        val_loss, train_loss = training(N_EPOCHS, model, train_loader, val_loader)
-        plot_simple_history(val_loss)
-        plot_train_loss(train_loss)
+        val_loss = training(N_EPOCHS, model, train_loader, val_loader)
+        # plot_simple_history(val_loss)
+        # plot_train_loss(train_loss)
         torch.save({'ae': model.state_dict()}, "saved_model/model.pth")
 
         ############ testing #################
@@ -72,15 +77,5 @@ def smd_cal_all():
 best_f1s = smd_cal_all()
 print(best_f1s)
 print(np.mean(np.array(best_f1s)))
-
-
-
-
-
-
-
-
-
-
 
 # t, th = bf_search(y_pred, y_test, start=0, end=1, step_num=1000, display_freq=50)
