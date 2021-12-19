@@ -34,18 +34,18 @@ class Decoder(nn.Module):
         self.latent_dim = latent_dim
         self.depth = depth
         self.hidden = nn.ModuleList(
-            [nn.Linear(int(latent_dim * (2 ** i)), int(latent_dim * (2 ** (i + 1)))) for i in range(depth)]
+            [nn.Linear(int(output_shape / (2 ** (i + 1))), int(output_shape / (2 ** i))) for i in reversed(range(depth))]
         )
-        self.out = nn.Linear(int(latent_dim * (2 ** depth)), int(output_shape))
+        self.restored = nn.Linear(int(latent_dim), int(output_shape / (2 ** depth)))
         self.ReLU = nn.ReLU(inplace=True)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, input):
-        x = self.hidden[0](input)
-        for i in range(1, self.depth):
+        x = self.restored(input)
+        for i in range(0, self.depth - 1):
             x = self.hidden[i](x)
             x = self.ReLU(x)
-        x = self.out(x)
+        x = self.hidden[self.depth - 1](x)
         x = self.sigmoid(x)
         return x
 

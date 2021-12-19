@@ -34,5 +34,7 @@ a = torch.randn([2, 4, 3])
 # res = torch.cat([a,b,c], dim=0)
 res = torch.flatten(a, start_dim=0, end_dim=0)
 
+for i in reversed(range(5)):
+    print(i)
 pass
 
