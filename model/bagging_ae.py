@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -93,6 +94,7 @@ class DivAE(nn.Module):
         loss_u.backward()
         optimizer_hi.step()
         optimizer_hi.zero_grad()
+        return loss_l, loss_u
 
 
 class BaggingAE:
@@ -120,10 +122,15 @@ class BaggingAE:
 
 def training(epochs, model, train_loader, opt_func=torch.optim.Adam):
     for epoch in range(epochs):
+        loss_low_sum, loss_high_sum = [], []
         for [batch] in train_loader:
             batch = to_device(batch, device)
             for i in range(model.n_estimators):
-                model.DivAEs[i].training_step(batch, opt_func=opt_func)
+                loss_l, loss_u = model.DivAEs[i].training_step(batch, opt_func=opt_func)
+                loss_low_sum.append(loss_l.detach().numpy())
+                loss_high_sum.append(loss_u.detach().numpy())
+        print('Epoch[{}]  loss_low: {:.4f}, loss_high: {:.4f}'.format(
+            epoch, np.array(loss_low_sum).sum(), np.array(loss_high_sum).sum()))
 
 
 def testing(model, test_loader):
