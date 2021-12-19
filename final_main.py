@@ -47,7 +47,7 @@ def smd_cal_all():
         # model = SF(BATCH_SIZE, window_size,smd_data.input_feature_dim, hidden_size, latent_size, num_layers=2, ensemble_size=4)
         model = to_device(model, device)
 
-        val_loss = training(N_EPOCHS, model, train_loader, val_loader)
+        val_loss = training(N_EPOCHS, model, train_loader)
         # plot_simple_history(val_loss)
         # plot_train_loss(train_loss)
         torch.save({'ae': model.state_dict()}, "saved_model/model.pth")

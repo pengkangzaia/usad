@@ -24,11 +24,15 @@ import torch.nn as nn
 from torch.autograd import Variable
 from sklearn.preprocessing import MinMaxScaler
 
-a = torch.randn([2, 4])
+a = torch.randn([2, 4, 3])
+# b = torch.randn([2, 4, 3])
+# c = torch.randn([2, 4, 3])
 # idx = [3, 1,2,0]
 # # torch.gather(a, dim=1, index=torch.tensor())
 # b = a[:,idx]
-b = torch.unsqueeze(a, dim=0)
-c = torch.unsqueeze(a, dim=0)
-d = torch.cat([b,c])
+# b = torch.transpose(a, 0, 1)
+# res = torch.cat([a,b,c], dim=0)
+res = torch.flatten(a, start_dim=0, end_dim=0)
+
 pass
+

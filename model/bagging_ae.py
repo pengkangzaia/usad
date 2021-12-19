@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 from utils.utils import *
@@ -48,9 +49,55 @@ class Decoder(nn.Module):
         return x
 
 
-class BaggingAE(nn.Module):
+# Loss function
+def quantile_loss(q, y, f):
+    e = (y - f)
+    a = torch.max(q * e, (q - 1) * e)
+    b = torch.mean(a, dim=-1)
+    return b
+
+
+class DivAE(nn.Module):
+    def __init__(self, input_dim, max_features: int = 3, encoding_depth: int = 2, latent_dim: int = 2,
+                 decoding_depth: int = 2, delta: float = 0.05):
+        super(DivAE, self).__init__()
+        self.input_dim = input_dim
+        self.max_features = max_features
+        self.encoding_depth = encoding_depth
+        self.latent_dim = latent_dim
+        self.decoding_depth = decoding_depth
+        self.delta = delta
+
+        self.encoder = Encoder(self.max_features, self.latent_dim, self.encoding_depth)
+        self.decoder_lb = Decoder(self.input_dim, self.latent_dim, self.decoding_depth)
+        self.decoder_ub = Decoder(self.input_dim, self.latent_dim, self.decoding_depth)
+        self.random_samples = np.random.choice(input_dim, replace=False, size=self.max_features)
+
+    def forward(self, input):
+        z = self.encoder(input[:, self.random_samples])
+        w_l = self.decoder_lb(z)
+        w_u = self.decoder_ub(z)
+        return w_l, w_u
+
+    def training_step(self, batch, opt_func=torch.optim.Adam):
+        optimizer_lo = opt_func(list(self.encoder.parameters()) + list(self.decoder_lb.parameters()))
+        optimizer_hi = opt_func(list(self.encoder.parameters()) + list(self.decoder_ub.parameters()))
+        o_l, o_u = self.forward(batch)
+        loss_l = torch.mean(quantile_loss(1 - self.delta, batch, o_l), dim=0)
+        loss_l.backward()
+        optimizer_lo.step()
+        optimizer_lo.zero_grad()
+
+        o_l, o_u = self.forward(batch)
+        loss_u = torch.mean(quantile_loss(self.delta, batch, o_u), dim=0)
+        loss_u.backward()
+        optimizer_hi.step()
+        optimizer_hi.zero_grad()
+
+
+class BaggingAE:
     def __init__(self, input_dim, n_estimators: int = 100, max_features: int = 3, encoding_depth: int = 2,
-                 latent_dim: int = 2, decoding_depth: int = 2):
+                 latent_dim: int = 2, decoding_depth: int = 2, delta: float = 0.05):
         super(BaggingAE, self).__init__()
         self.input_dim = input_dim
         self.n_estimators = n_estimators
@@ -58,85 +105,41 @@ class BaggingAE(nn.Module):
         self.encoding_depth = encoding_depth
         self.latent_dim = latent_dim
         self.decoding_depth = decoding_depth
-        self.encoders = nn.ModuleList(
-            [Encoder(self.max_features, self.latent_dim, self.encoding_depth) for _ in range(self.n_estimators)]
-        )
-        self.decoders = nn.ModuleList(
-            [Decoder(self.input_dim, self.latent_dim, self.decoding_depth) for _ in range(self.n_estimators)]
-        )
-        # the feature selector (bootstrapping)
-        self.random_samples = np.concatenate(
-            [
-                np.random.choice(input_dim, replace=False, size=(1, self.max_features)) for _
-                in range(self.n_estimators)
-            ]
+        # quantile bound for regression
+        self.delta = delta
+        self.DivAEs = nn.ModuleList(
+            [DivAE(input_dim=self.input_dim,
+                   max_features=self.max_features,
+                   encoding_depth=self.encoding_depth,
+                   latent_dim=self.latent_dim,
+                   decoding_depth=self.decoding_depth,
+                   delta=self.delta)
+             for _ in range(self.n_estimators)]
         )
 
-    def forward(self, input):
-        z = {'z_{}'.format(i): self.encoders[i](input[:, self.random_samples[i]]) for i in range(self.n_estimators)}
-        w = {'w_{}'.format(i): self.decoders[i](z['z_{}'.format(i)]) for i in range(self.n_estimators)}
-        o = torch.cat([torch.unsqueeze(i, dim=0) for i in w.values()])
-        return o
 
-    def training_step(self, batch):
-        out = self.forward(batch)
-        out = torch.mean(out, dim=0)
-        loss = torch.mean((batch - out) ** 2)
-        return loss
-
-    def validation_step(self, batch):
-        with torch.no_grad():
-            out = self.forward(batch)
-            out = torch.mean(out, dim=0)
-            loss = torch.mean((batch - out) ** 2)
-            return {'val_loss': loss}
-
-    def validation_epoch_end(self, outputs):
-        batch_losses = [x['val_loss'] for x in outputs]
-        epoch_loss = torch.stack(batch_losses).mean()
-        return {'val_loss': epoch_loss.item()}
-
-    def epoch_end(self, epoch, result):
-        print("Epoch [{}], val_loss: {:.4f}".format(epoch, result['val_loss']))
-
-    def get_param(self):
-        encoders = self.encoders
-        decoders = self.decoders
-        res = []
-        for i in encoders:
-            res += list(i.parameters())
-        for i in decoders:
-            res += list(i.parameters())
-        return res
-
-
-def evaluate(model, val_loader):
-    outputs = [model.validation_step(to_device(batch, device)) for [batch] in val_loader]
-    return model.validation_epoch_end(outputs)
-
-
-def training(epochs, model, train_loader, val_loader, opt_func=torch.optim.Adam):
-    val_losses = []
-    optimizer = opt_func(model.get_param())
+def training(epochs, model, train_loader, opt_func=torch.optim.Adam):
     for epoch in range(epochs):
         for [batch] in train_loader:
             batch = to_device(batch, device)
-            loss = model.training_step(batch)
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
-        val_loss = evaluate(model, val_loader)
-        model.epoch_end(epoch, val_loss)
-        val_losses.append(val_loss)
-    return val_losses
+            for i in range(model.n_estimators):
+                model.DivAEs[i].training_step(batch, opt_func=opt_func)
 
 
 def testing(model, test_loader):
     with torch.no_grad():
-        results = []
+        results_l, results_u = [], []
         for [batch] in test_loader:
             batch = to_device(batch, device)
-            out = model.forward(batch)
-            out = torch.mean(out, dim=0)
-            results.append(torch.mean((batch - out) ** 2, dim=1))
-        return results
+            w_l_estimator_sum, w_u_estimator_sum = [], []
+            for i in range(model.n_estimators):
+                w_l, w_u = model.DivAEs[i].forward(batch)
+                w_l_estimator_sum.append(torch.unsqueeze(w_l, dim=0))
+                w_u_estimator_sum.append(torch.unsqueeze(w_u, dim=0))
+            out_l = torch.cat(w_l_estimator_sum, dim=0)
+            out_u = torch.cat(w_u_estimator_sum, dim=0)
+            out_l, out_u = torch.transpose(out_l, 0, 1), torch.transpose(out_u, 0, 1)
+            results_l.append(out_l)
+            results_u.append(out_u)
+        y_pred_l, y_pred_u = torch.cat(results_l, dim=0), torch.cat(results_u, dim=0)
+        return y_pred_l, y_pred_u
