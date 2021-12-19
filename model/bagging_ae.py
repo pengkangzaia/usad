@@ -96,6 +96,17 @@ class DivAE(nn.Module):
         optimizer_hi.zero_grad()
         return loss_l, loss_u
 
+    def training_step_v1(self, batch, opt_func=torch.optim.Adam):
+        optimizer = opt_func(list(self.encoder.parameters()) + list(self.decoder_lb.parameters()) + list(self.decoder_ub.parameters()))
+        o_l, o_u = self.forward(batch)
+        loss_l = torch.mean(quantile_loss(1 - self.delta, batch, o_l), dim=0)
+        loss_u = torch.mean(quantile_loss(self.delta, batch, o_u), dim=0)
+        loss = loss_l + loss_u
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+        return loss_l, loss_u
+
 
 class BaggingAE:
     def __init__(self, input_dim, n_estimators: int = 100, max_features: int = 3, encoding_depth: int = 2,
@@ -126,11 +137,12 @@ def training(epochs, model, train_loader, opt_func=torch.optim.Adam):
         for [batch] in train_loader:
             batch = to_device(batch, device)
             for i in range(model.n_estimators):
-                loss_l, loss_u = model.DivAEs[i].training_step(batch, opt_func=opt_func)
+                # loss_l, loss_u = model.DivAEs[i].training_step(batch, opt_func=opt_func)
+                loss_l, loss_u = model.DivAEs[i].training_step_v1(batch, opt_func=opt_func)
                 loss_low_sum.append(loss_l.detach().cpu().numpy())
                 loss_high_sum.append(loss_u.detach().cpu().numpy())
         print('Epoch[{}]  loss_low: {:.4f}, loss_high: {:.4f}'.format(
-            epoch, np.array(loss_low_sum).sum(), np.array(loss_high_sum).sum()))
+            epoch, np.array(loss_low_sum).mean(), np.array(loss_high_sum).mean()))
 
 
 def testing(model, test_loader):
