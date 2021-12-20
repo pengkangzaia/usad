@@ -46,13 +46,9 @@ for i in range(len(labels)-window_size):
 y_test = [1.0 if (np.sum(window) > 0) else 0 for window in windows_labels]
 y_test = np.array(y_test)
 ############## training ###################
-hidden_size = 100
 BATCH_SIZE = 500
 N_EPOCHS = 5
-
 N = 5 * round((normal.shape[1] / 3) / 5)  # 10 for both bootstrap sample size and number of estimators
-encoder_layers = 1  # number of hidden layers for each encoder
-decoder_layers = 2  # number of hidden layers for each decoder
 z = int((N / 2) - 1)  # size of latent space
 
 windows_normal_train = windows_normal[:int(np.floor(.8 * windows_normal.shape[0]))]
@@ -78,16 +74,15 @@ model = BaggingLstmVAE(time_step=window_size,
                        hidden_size=N,
                        n_estimators=N,
                        max_features=N,
-                       latent_dim=z)
+                       latent_dim=z,
+                       delta=0.95)
 for i in range(model.n_estimators):
     model.LSTMVAEs[i] = to_device(model.LSTMVAEs[i], device)
     model.DivLstmVAEs[i] = to_device(model.DivLstmVAEs[i], device)
 
 history = training(N_EPOCHS, model, train_loader)
 
-lower_origin, upper_origin = testing(model, test_loader)
-lower = lower_origin[:, :, -1, :]
-upper = upper_origin[:, :, -1, :]
+lower, upper = testing(model, test_loader)
 # 点调整法
 windows_attack = windows_attack[:, -1, :]
 attack_tiles = np.tile(windows_attack.reshape(windows_attack.shape[0], 1, windows_attack.shape[1]), (1, N, 1))

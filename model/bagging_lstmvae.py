@@ -191,6 +191,8 @@ def testing(model, test_loader):
             w_l_estimator_sum, w_u_estimator_sum = [], []
             for i in range(model.n_estimators):
                 w_l, w_u = model.DivLstmVAEs[i].forward(batch)
+                w_l = w_l[:, -1, :]
+                w_u = w_u[:, -1, :]
                 w_l_estimator_sum.append(torch.unsqueeze(w_l, dim=0))
                 w_u_estimator_sum.append(torch.unsqueeze(w_u, dim=0))
             out_l = torch.cat(w_l_estimator_sum, dim=0)
