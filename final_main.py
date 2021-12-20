@@ -5,7 +5,7 @@ from data.SWaT.swat_processor import *
 from data.ServerMachineDataset.smd_processor import *
 # from model.statefulsf_mogai import *
 # from model.ae import *
-from model.bagging_ae import *
+from model.lstmvae import *
 
 device = get_default_device()
 
@@ -33,21 +33,21 @@ def smd_cal_all():
     entity_ids = ["1-1", "1-2"]
     best_f1s = []
     for entity_id in entity_ids:
-        smd_data = SmdAe(entity_id=entity_id, batch_size=BATCH_SIZE, window_size=window_size)
+        smd_data = SMD(entity_id=entity_id, batch_size=BATCH_SIZE, window_size=window_size)
         train_loader, val_loader, test_loader = smd_data.get_dataloader()
         labels = smd_data.attack_labels
 
         # model = StatefulSfLinear(BATCH_SIZE, window_size, smd_data.input_feature_dim, hidden_size, latent_size,
         #            ensemble_size=4)
-        # model = LSTMVAE(BATCH_SIZE, window_size, smd_data.input_feature_dim, hidden_size, latent_size)
+        model = LSTMVAE(BATCH_SIZE, window_size, smd_data.input_feature_dim, hidden_size, latent_size)
         # model = AE(window_size * smd_data.input_feature_dim, window_size * latent_size)
         input_shape = smd_data.input_feature_dim
-        model = BaggingAE(input_dim=input_shape, n_estimators=7, max_features=5, encoding_depth=2, decoding_depth=3, latent_dim=4)
+        # model = BaggingAE(input_dim=input_shape, n_estimators=7, max_features=5, encoding_depth=2, decoding_depth=3, latent_dim=4)
         # model = UsadModel(window_size * smd_data.input_feature_dim, window_size * latent_size)
         # model = SF(BATCH_SIZE, window_size,smd_data.input_feature_dim, hidden_size, latent_size, num_layers=2, ensemble_size=4)
         model = to_device(model, device)
 
-        val_loss = training(N_EPOCHS, model, train_loader)
+        val_loss = training(N_EPOCHS, model, train_loader, val_loader)
         # plot_simple_history(val_loss)
         # plot_train_loss(train_loss)
         torch.save({'ae': model.state_dict()}, "saved_model/model.pth")
