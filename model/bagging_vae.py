@@ -170,6 +170,7 @@ def training(epochs, model, train_loader, opt_func=torch.optim.Adam):
     for epoch in range(epochs):
         loss_low_sum, loss_high_sum = [], []
         for [batch] in train_loader:
+            batch = to_device(batch, device)
             for i in range(model.n_estimators):
                 loss_l, loss_u = model.DivVAEs[i].training_step(batch, opt_func=opt_func)
                 loss_low_sum.append(loss_l.detach().cpu().numpy())
