@@ -9,7 +9,7 @@ device = get_default_device()
 
 min_max_scaler = preprocessing.MinMaxScaler()
 # Read data
-normal = pd.read_csv("data/SWaT/SWaT_Dataset_Normal_v1.csv", nrows=10000)  # , nrows=1000)
+normal = pd.read_csv("data/SWaT/SWaT_Dataset_Normal_v1.csv", nrows=1000)  # , nrows=1000)
 normal = normal.drop(["Timestamp", "Normal/Attack"], axis=1)
 # Transform all columns into float64
 for i in list(normal):
@@ -21,7 +21,7 @@ x_scaled = min_max_scaler.fit_transform(x)
 normal = pd.DataFrame(x_scaled)
 
 # Read data
-attack = pd.read_csv("data/SWaT/SWaT_Dataset_Attack_v0.csv", sep=";", nrows=10000)  # , nrows=1000)
+attack = pd.read_csv("data/SWaT/SWaT_Dataset_Attack_v0.csv", sep=";", nrows=1000)  # , nrows=1000)
 labels = [float(label != 'Normal') for label in attack["Normal/Attack"].values]
 attack = attack.drop(["Timestamp", "Normal/Attack"], axis=1)
 # Transform all columns into float64
