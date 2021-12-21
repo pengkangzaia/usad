@@ -47,7 +47,7 @@ y_test = [1.0 if (np.sum(window) > 0) else 0 for window in windows_labels]
 y_test = np.array(y_test)
 ############## training ###################
 BATCH_SIZE = 500
-N_EPOCHS = 10
+N_EPOCHS = 3
 N = 5 * round((normal.shape[1] / 3) / 5)  # 10 for both bootstrap sample size and number of estimators
 decoder_layers = 2  # number of hidden layers for each decoder
 z = int((N / 2) - 1)  # size of latent space
@@ -96,3 +96,19 @@ result = np.where((attack_tiles < upper.numpy()) | (attack_tiles > lower.numpy()
 inference = np.mean(np.mean(result, axis=1), axis=1)
 print(inference[0:100])
 t, th = bf_search(inference, y_test, start=0, end=1, step_num=1000, display_freq=50)
+
+a = lower.detach().cpu()[:,-1,:].numpy()
+b = upper.detach().cpu()[:,-1,:].numpy()
+for i in range(a.shape[-1]):
+  print("========计算第" + str(i) + "个特征========")
+  aUb, aLb, eq = [], [], []
+  for j in range(len(a[:,i])):
+      if a[j][i] > b[j][i]:
+          aUb.append(j)
+      elif a[j][i] < b[j][i]:
+          aLb.append(j)
+      else:
+          eq.append(j)
+  print("lower bound大于upper bound的个数为：" + str(len(aUb)))
+  print("lower bound小于upper bound的个数为：" + str(len(aLb)))
+  print("lower bound等于upper bound的个数为：" + str(len(eq)))
