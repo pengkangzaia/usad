@@ -183,7 +183,7 @@ def training(encoder_epochs, decoder_epochs, model, train_loader, opt_func=torch
             for i in range(model.n_estimators):
                 vae_loss = model.LSTMVAEs[i].training_step(batch, opt_func=opt_func)
                 vae_losses.append(vae_loss.detach().cpu().numpy())
-        print('Epoch[{}]  loss_vae: {:.4f}'.format(epoch, np.array(vae_losses).mean()))
+        print('Epoch[{}]  loss_vae: {:.7f}'.format(epoch, np.array(vae_losses).mean()))
     # 阶段2：训练upper bound decoder和lower bound decoder
     print('lower decoder, upper decoder开始训练')
     for epoch in range(decoder_epochs):
@@ -194,7 +194,7 @@ def training(encoder_epochs, decoder_epochs, model, train_loader, opt_func=torch
                 loss_u, loss_l = model.DivLstmVAEs[i].training_step(batch, opt_func=opt_func)
                 loss_low_sum.append(loss_l.detach().cpu().numpy())
                 loss_high_sum.append(loss_u.detach().cpu().numpy())
-        print('Epoch[{}]  loss_low: {:.4f}, loss_high: {:.4f}'.format(
+        print('Epoch[{}]  loss_low: {:.7f}, loss_high: {:.7f}'.format(
             epoch, np.array(loss_low_sum).mean(), np.array(loss_high_sum).mean()))
 
 
