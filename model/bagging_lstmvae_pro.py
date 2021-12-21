@@ -132,17 +132,18 @@ class DivLstmVAE(nn.Module):
             z_mean = self.lstm_vae.ReLU(self.lstm_vae.z_mean_linear(encode_h[:, -1, :]))
             z_log = self.lstm_vae.ReLU(self.lstm_vae.z_sigma_linear(encode_h[:, -1, :]))
             z = re_parameterization(z_mean, z_log)
+            repeated_z = torch.unsqueeze(z, 1).repeat(1, input.shape[1], 1)
 
-        out_lo = self.decoder_lo(z)
-        out_hi = self.decoder_hi(z)
+        out_lo = self.decoder_lo(repeated_z)
+        out_hi = self.decoder_hi(repeated_z)
         return out_lo, out_hi
 
     def training_step(self, batch, opt_func=torch.optim.Adam):
         optimizer1 = opt_func(list(self.decoder_lo.parameters()))
         optimizer2 = opt_func(list(self.decoder_hi.parameters()))
         o_l, o_u = self.forward(batch)
-        loss_l = torch.mean(self.quantile_loss(1 - self.delta, batch[:, -1, :], o_l), dim=0)
-        loss_u = torch.mean(self.quantile_loss(self.delta, batch[:, -1, :], o_u), dim=0)
+        loss_l = torch.mean(torch.mean(self.quantile_loss(1 - self.delta, batch, o_l), dim=0))
+        loss_u = torch.mean(torch.mean(self.quantile_loss(self.delta, batch, o_u), dim=0))
         loss_l.backward()
         optimizer1.step()
         optimizer1.zero_grad()
@@ -208,6 +209,8 @@ def testing(model, test_loader):
             w_l_estimator_sum, w_u_estimator_sum = [], []
             for i in range(model.n_estimators):
                 w_l, w_u = model.DivLstmVAEs[i].forward(batch)
+                w_l = w_l[:, -1, :]
+                w_u = w_u[:, -1, :]
                 w_l_estimator_sum.append(torch.unsqueeze(w_l, dim=0))
                 w_u_estimator_sum.append(torch.unsqueeze(w_u, dim=0))
             out_l = torch.cat(w_l_estimator_sum, dim=0)
