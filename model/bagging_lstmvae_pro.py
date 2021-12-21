@@ -115,13 +115,13 @@ class DivLstmVAE(nn.Module):
         self.latent_dim = latent_dim
         self.decoder_depth = decoder_depth
         self.delta = delta
-        self.decoder_lo = Decoder(output_shape=input_shape, latent_dim=latent_dim, depth=self.decoder_depth)
         self.decoder_hi = Decoder(output_shape=input_shape, latent_dim=latent_dim, depth=self.decoder_depth)
+        self.decoder_lo = Decoder(output_shape=input_shape, latent_dim=latent_dim, depth=self.decoder_depth)
 
     # Loss function
     def quantile_loss(self, q, y, f):
-        e = (y - f)
-        a = torch.max(q * e, (q - 1) * e)
+        e = torch.abs(y - f)
+        a = torch.maximum(q * e, (1 - q) * e)
         b = torch.mean(a, dim=-1)
         return b
 
@@ -134,24 +134,24 @@ class DivLstmVAE(nn.Module):
             z = re_parameterization(z_mean, z_log)
             repeated_z = torch.unsqueeze(z, 1).repeat(1, input.shape[1], 1)
 
-        out_lo = self.decoder_lo(repeated_z)
         out_hi = self.decoder_hi(repeated_z)
-        return out_lo, out_hi
+        out_lo = self.decoder_lo(repeated_z)
+        return out_hi, out_lo
 
     def training_step(self, batch, opt_func=torch.optim.Adam):
-        optimizer1 = opt_func(list(self.decoder_lo.parameters()))
-        optimizer2 = opt_func(list(self.decoder_hi.parameters()))
-        o_l, o_u = self.forward(batch)
-        loss_l = torch.mean(torch.mean(self.quantile_loss(1 - self.delta, batch, o_l), dim=0))
-        loss_u = torch.mean(torch.mean(self.quantile_loss(self.delta, batch, o_u), dim=0))
-        loss_l.backward()
+        optimizer1 = opt_func(list(self.decoder_hi.parameters()))
+        optimizer2 = opt_func(list(self.decoder_lo.parameters()))
+        o_hi, o_lo = self.forward(batch)
+        loss_hi = torch.mean(torch.mean(self.quantile_loss(1 - self.delta, batch, o_hi), dim=0))
+        loss_lo = torch.mean(torch.mean(self.quantile_loss(self.delta, batch, o_lo), dim=0))
+        loss_hi.backward()
         optimizer1.step()
         optimizer1.zero_grad()
 
-        loss_u.backward()
+        loss_lo.backward()
         optimizer2.step()
         optimizer2.zero_grad()
-        return loss_l, loss_u
+        return loss_hi, loss_lo
 
 
 class BaggingLstmVAE:
@@ -194,7 +194,7 @@ def training(epochs, model, train_loader, opt_func=torch.optim.Adam):
         for [batch] in train_loader:
             batch = to_device(batch, device)
             for i in range(model.n_estimators):
-                loss_l, loss_u = model.DivLstmVAEs[i].training_step(batch, opt_func=opt_func)
+                loss_u, loss_l = model.DivLstmVAEs[i].training_step(batch, opt_func=opt_func)
                 loss_low_sum.append(loss_l.detach().cpu().numpy())
                 loss_high_sum.append(loss_u.detach().cpu().numpy())
         print('Epoch[{}]  loss_low: {:.4f}, loss_high: {:.4f}'.format(
@@ -208,7 +208,7 @@ def testing(model, test_loader):
             batch = to_device(batch, device)
             w_l_estimator_sum, w_u_estimator_sum = [], []
             for i in range(model.n_estimators):
-                w_l, w_u = model.DivLstmVAEs[i].forward(batch)
+                w_u, w_l = model.DivLstmVAEs[i].forward(batch)
                 w_l = w_l[:, -1, :]
                 w_u = w_u[:, -1, :]
                 w_l_estimator_sum.append(torch.unsqueeze(w_l, dim=0))
