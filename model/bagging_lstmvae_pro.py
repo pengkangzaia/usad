@@ -120,7 +120,7 @@ class DivLstmVAE(nn.Module):
 
     # Loss function
     def quantile_loss(self, q, y, f):
-        zeros = torch.zeros(y.shape)
+        zeros = torch.zeros(y.shape, device=device)
         e = torch.maximum(zeros, y - f)
         a = torch.maximum(q * e, (1 - q) * e)
         b = torch.mean(a, dim=-1)
