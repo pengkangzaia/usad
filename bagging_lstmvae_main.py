@@ -1,6 +1,6 @@
 import numpy as np
 
-from model.bagging_lstmvae import *
+from model.bagging_lstmvae_pro import *
 import torch.utils.data as data_utils
 from utils.eval_methods import *
 from sklearn import preprocessing
@@ -9,7 +9,7 @@ device = get_default_device()
 
 min_max_scaler = preprocessing.MinMaxScaler()
 # Read data
-normal = pd.read_csv("data/SWaT/SWaT_Dataset_Normal_v1.csv", nrows=1000)  # , nrows=1000)
+normal = pd.read_csv("data/SWaT/SWaT_Dataset_Normal_v1.csv", nrows=10000)  # , nrows=1000)
 normal = normal.drop(["Timestamp", "Normal/Attack"], axis=1)
 # Transform all columns into float64
 for i in list(normal):
@@ -21,7 +21,7 @@ x_scaled = min_max_scaler.fit_transform(x)
 normal = pd.DataFrame(x_scaled)
 
 # Read data
-attack = pd.read_csv("data/SWaT/SWaT_Dataset_Attack_v0.csv", sep=";", nrows=1000)  # , nrows=1000)
+attack = pd.read_csv("data/SWaT/SWaT_Dataset_Attack_v0.csv", sep=";", nrows=10000)  # , nrows=1000)
 labels = [float(label != 'Normal') for label in attack["Normal/Attack"].values]
 attack = attack.drop(["Timestamp", "Normal/Attack"], axis=1)
 # Transform all columns into float64
@@ -47,8 +47,9 @@ y_test = [1.0 if (np.sum(window) > 0) else 0 for window in windows_labels]
 y_test = np.array(y_test)
 ############## training ###################
 BATCH_SIZE = 500
-N_EPOCHS = 5
+N_EPOCHS = 10
 N = 5 * round((normal.shape[1] / 3) / 5)  # 10 for both bootstrap sample size and number of estimators
+decoder_layers = 2  # number of hidden layers for each decoder
 z = int((N / 2) - 1)  # size of latent space
 
 windows_normal_train = windows_normal[:int(np.floor(.8 * windows_normal.shape[0]))]
@@ -75,7 +76,7 @@ model = BaggingLstmVAE(time_step=window_size,
                        n_estimators=N,
                        max_features=N,
                        latent_dim=z,
-                       delta=0.95)
+                       decoding_depth=decoder_layers)
 for i in range(model.n_estimators):
     model.LSTMVAEs[i] = to_device(model.LSTMVAEs[i], device)
     model.DivLstmVAEs[i] = to_device(model.DivLstmVAEs[i], device)
@@ -88,6 +89,10 @@ windows_attack = windows_attack[:, -1, :]
 attack_tiles = np.tile(windows_attack.reshape(windows_attack.shape[0], 1, windows_attack.shape[1]), (1, N, 1))
 result = np.where((attack_tiles < lower.numpy()) | (attack_tiles > upper.numpy()), 1, 0)
 inference = np.mean(np.mean(result, axis=1), axis=1)
+print(inference[0:100])
+t, th = bf_search(inference, y_test, start=0, end=1, step_num=1000, display_freq=50)
 
-t, th = bf_search(inference, y_test, start=0, end=1, step_num=1000,
-                  display_freq=50)
+result = np.where((attack_tiles < upper.numpy()) | (attack_tiles > lower.numpy()), 1, 0)
+inference = np.mean(np.mean(result, axis=1), axis=1)
+print(inference[0:100])
+t, th = bf_search(inference, y_test, start=0, end=1, step_num=1000, display_freq=50)
