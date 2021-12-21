@@ -24,7 +24,9 @@ import torch.nn as nn
 from torch.autograd import Variable
 from sklearn.preprocessing import MinMaxScaler
 
-a = torch.randn([2, 4, 3])
+a = torch.randn(4)
+b = torch.randn(4)
+c = torch.max(a, b)
 # b = torch.randn([2, 4, 3])
 # c = torch.randn([2, 4, 3])
 # idx = [3, 1,2,0]
@@ -32,9 +34,8 @@ a = torch.randn([2, 4, 3])
 # b = a[:,idx]
 # b = torch.transpose(a, 0, 1)
 # res = torch.cat([a,b,c], dim=0)
-res = torch.flatten(a, start_dim=0, end_dim=0)
 
-for i in reversed(range(5)):
-    print(i)
+
+
 pass
 
