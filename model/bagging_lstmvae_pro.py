@@ -138,14 +138,18 @@ class DivLstmVAE(nn.Module):
         return out_lo, out_hi
 
     def training_step(self, batch, opt_func=torch.optim.Adam):
-        optimizer = opt_func(list(self.decoder_lo.parameters()) + list(self.decoder_hi.parameters()))
+        optimizer1 = opt_func(list(self.decoder_lo.parameters()))
+        optimizer2 = opt_func(list(self.decoder_hi.parameters()))
         o_l, o_u = self.forward(batch)
         loss_l = torch.mean(self.quantile_loss(1 - self.delta, batch[:, -1, :], o_l), dim=0)
         loss_u = torch.mean(self.quantile_loss(self.delta, batch[:, -1, :], o_u), dim=0)
-        loss = loss_l + loss_u
-        loss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
+        loss_l.backward()
+        optimizer1.step()
+        optimizer1.zero_grad()
+
+        loss_u.backward()
+        optimizer2.step()
+        optimizer2.zero_grad()
         return loss_l, loss_u
 
 
