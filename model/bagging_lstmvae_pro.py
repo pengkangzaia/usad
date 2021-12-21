@@ -172,10 +172,10 @@ class BaggingLstmVAE:
              for i in range(self.n_estimators)])
 
 
-def training(epochs, model, train_loader, opt_func=torch.optim.Adam):
+def training(encoder_epochs, decoder_epochs, model, train_loader, opt_func=torch.optim.Adam):
     # 阶段1：训练VAE中的encoder
     print('VAE encoder开始训练')
-    for epoch in range(epochs):
+    for epoch in range(encoder_epochs):
         vae_losses = []
         for [batch] in train_loader:
             batch = to_device(batch, device)
@@ -185,7 +185,7 @@ def training(epochs, model, train_loader, opt_func=torch.optim.Adam):
         print('Epoch[{}]  loss_vae: {:.4f}'.format(epoch, np.array(vae_losses).mean()))
     # 阶段2：训练upper bound decoder和lower bound decoder
     print('lower decoder, upper decoder开始训练')
-    for epoch in range(epochs):
+    for epoch in range(decoder_epochs):
         loss_low_sum, loss_high_sum = [], []
         for [batch] in train_loader:
             batch = to_device(batch, device)

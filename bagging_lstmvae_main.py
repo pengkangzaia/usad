@@ -81,7 +81,7 @@ for i in range(model.n_estimators):
     model.LSTMVAEs[i] = to_device(model.LSTMVAEs[i], device)
     model.DivLstmVAEs[i] = to_device(model.DivLstmVAEs[i], device)
 
-history = training(N_EPOCHS, model, train_loader)
+history = training(N_EPOCHS, 20, model, train_loader)
 
 lower, upper = testing(model, test_loader)
 # 点调整法
