@@ -83,7 +83,7 @@ for i in range(model.n_estimators):
 
 history = training(N_EPOCHS, 20, model, train_loader)
 
-lower, upper = testing(model, test_loader)
+upper, lower = testing(model, test_loader)
 # 点调整法
 windows_attack = windows_attack[:, -1, :]
 attack_tiles = np.tile(windows_attack.reshape(windows_attack.shape[0], 1, windows_attack.shape[1]), (1, N, 1))

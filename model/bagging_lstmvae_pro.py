@@ -81,7 +81,7 @@ class LSTMVAE(nn.Module):
         repeated_z = torch.unsqueeze(z, 1).repeat(1, x.shape[1], 1)
         decode_h, (_h, _c) = self.hidden_LSTM(repeated_z, (_h, _c))
         decode_h = self.tanh(decode_h)
-        x_hat, (_h, _c) = self.output_LSTM(decode_h, (_h, _c))
+        x_hat, (_h, _c) = self.output_LSTM(decode_h)
         x_hat = self.tanh(x_hat)
         # cache running param
         self.sigma = sigma
@@ -90,9 +90,9 @@ class LSTMVAE(nn.Module):
 
     # loss function
     def loss_function(self, origin, reconstruction, mean, log_var):
-        BCELoss = nn.BCELoss(reduction='sum')
-        reconstruction_loss = BCELoss(reconstruction, origin)
-        KL_divergence = -0.5 * torch.sum(1 + log_var - torch.exp(log_var) - mean * mean)
+        MSELoss = nn.MSELoss(reduction='sum')
+        reconstruction_loss = MSELoss(reconstruction, origin)
+        KL_divergence = -0.5 * torch.sum(1 + log_var - torch.exp(log_var) - mean * mean) * origin.shape[1]
         return reconstruction_loss + KL_divergence
 
     # training
@@ -139,19 +139,21 @@ class DivLstmVAE(nn.Module):
             z = re_parameterization(z_mean, z_log)
             repeated_z = torch.unsqueeze(z, 1).repeat(1, input.shape[1], 1)
 
-        out_lo, (_h, _c) = self.hidden_LSTM_lo(repeated_z, (_h, _c))
+        origin_h, origin_c = _h, _c
+        out_lo, (_h, _c) = self.hidden_LSTM_lo(repeated_z, (origin_h, origin_c))
         out_lo = self.tanh(out_lo)
-        out_lo, (_h, _c) = self.output_LSTM_lo(out_lo, (_h, _c))
+        out_lo, (_h, _c) = self.output_LSTM_lo(out_lo)
         out_lo = self.tanh(out_lo)
 
-        out_hi, (_h, _c) = self.hidden_LSTM_hi(repeated_z, (_h, _c))
+        out_hi, (_h, _c) = self.hidden_LSTM_hi(repeated_z, (origin_h, origin_c))
         out_hi = self.tanh(out_hi)
-        out_hi, (_h, _c) = self.output_LSTM_lo(out_hi, (_h, _c))
+        out_hi, (_h, _c) = self.output_LSTM_lo(out_hi)
         out_hi = self.tanh(out_hi)
         return out_hi, out_lo
 
     def training_step(self, batch, opt_func=torch.optim.Adam):
-        optimizer = opt_func(list(self.decoder_hi.parameters()) + list(self.decoder_lo.parameters()))
+        optimizer = opt_func(list(self.hidden_LSTM_lo.parameters()) + list(self.output_LSTM_lo.parameters())
+                             + list(self.hidden_LSTM_hi.parameters()) + list(self.output_LSTM_hi.parameters()))
         o_hi, o_lo = self.forward(batch)
         loss_hi = torch.mean(torch.mean(self.quantile_loss(1 - self.delta, batch, o_hi), dim=0))
         loss_lo = torch.mean(torch.mean(self.quantile_loss(self.delta, batch, o_lo), dim=0))
