@@ -1,5 +1,5 @@
 import torch.nn as nn
-
+from torch.nn import functional as F
 from utils.utils import *
 
 device = get_default_device()
@@ -76,10 +76,15 @@ class Vae(nn.Module):
         return res, z_mean, z_log
 
     def loss_function(self, origin, reconstruction, mean, log_var):
-        MSE_LOSS = nn.MSELoss(reduction='sum')
-        reconstruction_loss = MSE_LOSS(reconstruction, origin)
-        KL_divergence = -0.5 * torch.sum(1 + log_var - torch.exp(log_var) - mean * mean)
-        return reconstruction_loss + KL_divergence
+        # MSE_LOSS = nn.MSELoss(reduction='sum')
+        # reconstruction_loss = MSE_LOSS(reconstruction, origin)
+        # KL_divergence = -0.5 * torch.sum(1 + log_var - torch.exp(log_var) - mean * mean)
+        # return reconstruction_loss + KL_divergence
+
+        BCE = F.binary_cross_entropy(reconstruction, origin, reduction='sum')
+        # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
+        KLD = -0.5 * torch.sum(1 + log_var - mean.pow(2) - log_var.exp())
+        return BCE + KLD
 
     def training_step(self, batch, opt_func=torch.optim.Adam):
         optimizer = opt_func(list(self.encoder.parameters()) + list(self.decoder.parameters()))
