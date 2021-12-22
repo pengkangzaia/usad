@@ -123,24 +123,22 @@ class DivVAE(nn.Module):
     def forward(self, input):
         z_mean, z_log = self.encoder(input[:, self.random_samples])
         z = re_parameterization(z_mean, z_log)
-        out_hi = self.decoder_hi(z)
         out_lo = self.decoder_lo(z)
-        return out_hi, out_lo, z_mean, z_log
+        out_hi = self.decoder_hi(z)
+        return out_lo, out_hi, z_mean, z_log
 
     def training_step(self, batch, opt_func=torch.optim.Adam):
         optimizer = opt_func(list(self.encoder.parameters()) +
                              list(self.decoder_lo.parameters()) +
                              list(self.decoder_hi.parameters()))
         o_hi, o_lo, z_mean, z_log = self.forward(batch)
-        # loss_hi = torch.mean(self.loss_function(1 - self.delta, batch, o_hi, z_mean, z_log), dim=0)
-        loss_hi = self.loss_function(1 - self.delta, batch, o_hi, z_mean, z_log)
         loss_lo = self.loss_function(self.delta, batch, o_hi, z_mean, z_log)
-        # loss_lo = torch.mean(self.loss_function(self.delta, batch, o_lo, z_mean, z_log), dim=0)
+        loss_hi = self.loss_function(1 - self.delta, batch, o_hi, z_mean, z_log)
         loss = loss_hi + loss_lo
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
-        return loss_hi, loss_lo
+        return loss_lo, loss_hi
 
 
 class BaggingVAE:
@@ -172,7 +170,7 @@ def training(epochs, model, train_loader, opt_func=torch.optim.Adam):
         for [batch] in train_loader:
             batch = to_device(batch, device)
             for i in range(model.n_estimators):
-                loss_u, loss_l = model.DivVAEs[i].training_step(batch, opt_func=opt_func)
+                loss_l, loss_u = model.DivVAEs[i].training_step(batch, opt_func=opt_func)
                 loss_high_sum.append(loss_u.detach().cpu().numpy())
                 loss_low_sum.append(loss_l.detach().cpu().numpy())
         print('Epoch[{}]  loss_low: {:.4f}, loss_high: {:.4f}'.format(
@@ -186,7 +184,7 @@ def testing(model, test_loader):
             batch = to_device(batch, device)
             w_l_estimator_sum, w_u_estimator_sum = [], []
             for i in range(model.n_estimators):
-                w_u, w_l, _mean, _log = model.DivVAEs[i].forward(batch)
+                w_l, w_u, _mean, _log = model.DivVAEs[i].forward(batch)
                 w_u_estimator_sum.append(torch.unsqueeze(w_u, dim=0))
                 w_l_estimator_sum.append(torch.unsqueeze(w_l, dim=0))
             out_l = torch.cat(w_l_estimator_sum, dim=0)
