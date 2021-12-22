@@ -79,9 +79,9 @@ class LSTMVAE(nn.Module):
         sigma = self.ReLU(self.z_sigma_linear(encode_h[:, -1, :]))
         z = re_parameterization(mean, sigma)
         repeated_z = torch.unsqueeze(z, 1).repeat(1, x.shape[1], 1)
-        decode_h, (_h, _c) = self.hidden_LSTM(repeated_z)
+        decode_h, (_h, _c) = self.hidden_LSTM(repeated_z, (_h, _c))
         decode_h = self.tanh(decode_h)
-        x_hat, (_h, _c) = self.output_LSTM(decode_h)
+        x_hat, (_h, _c) = self.output_LSTM(decode_h, (_h, _c))
         x_hat = self.tanh(x_hat)
         # cache running param
         self.sigma = sigma
@@ -90,8 +90,8 @@ class LSTMVAE(nn.Module):
 
     # loss function
     def loss_function(self, origin, reconstruction, mean, log_var):
-        MSELoss = nn.MSELoss()
-        reconstruction_loss = MSELoss(reconstruction, origin)
+        BCELoss = nn.BCELoss(reduction='sum')
+        reconstruction_loss = BCELoss(reconstruction, origin)
         KL_divergence = -0.5 * torch.sum(1 + log_var - torch.exp(log_var) - mean * mean)
         return reconstruction_loss + KL_divergence
 
@@ -107,16 +107,21 @@ class LSTMVAE(nn.Module):
 
 
 class DivLstmVAE(nn.Module):
-    def __init__(self, lstmvae_model: LSTMVAE, input_shape, latent_dim: int, decoder_depth: int = 2,
+    def __init__(self, lstmvae_model: LSTMVAE, input_shape, latent_dim: int,hidden_size: int,
                  delta: float = 0.05):
         super(DivLstmVAE, self).__init__()
         self.lstm_vae = lstmvae_model
         self.input_shape = input_shape
         self.latent_dim = latent_dim
-        self.decoder_depth = decoder_depth
         self.delta = delta
-        self.decoder_hi = Decoder(output_shape=input_shape, latent_dim=latent_dim, depth=self.decoder_depth)
-        self.decoder_lo = Decoder(output_shape=input_shape, latent_dim=latent_dim, depth=self.decoder_depth)
+
+        self.hidden_LSTM_lo = nn.LSTM(input_size=latent_dim, hidden_size=hidden_size, batch_first=True, num_layers=2)
+        self.output_LSTM_lo = nn.LSTM(input_size=hidden_size, hidden_size=input_shape, batch_first=True, num_layers=2)
+        self.hidden_LSTM_hi = nn.LSTM(input_size=latent_dim, hidden_size=hidden_size, batch_first=True, num_layers=2)
+        self.output_LSTM_hi = nn.LSTM(input_size=hidden_size, hidden_size=input_shape, batch_first=True, num_layers=2)
+        self.tanh = nn.Tanh()
+        # self.decoder_hi = Decoder(output_shape=input_shape, latent_dim=latent_dim, depth=self.decoder_depth)
+        # self.decoder_lo = Decoder(output_shape=input_shape, latent_dim=latent_dim, depth=self.decoder_depth)
 
     # Loss function
     def quantile_loss(self, q, y, f):
@@ -134,8 +139,15 @@ class DivLstmVAE(nn.Module):
             z = re_parameterization(z_mean, z_log)
             repeated_z = torch.unsqueeze(z, 1).repeat(1, input.shape[1], 1)
 
-        out_hi = self.decoder_hi(repeated_z)
-        out_lo = self.decoder_lo(repeated_z)
+        out_lo, (_h, _c) = self.hidden_LSTM_lo(repeated_z, (_h, _c))
+        out_lo = self.tanh(out_lo)
+        out_lo, (_h, _c) = self.output_LSTM_lo(out_lo, (_h, _c))
+        out_lo = self.tanh(out_lo)
+
+        out_hi, (_h, _c) = self.hidden_LSTM_hi(repeated_z, (_h, _c))
+        out_hi = self.tanh(out_hi)
+        out_hi, (_h, _c) = self.output_LSTM_lo(out_hi, (_h, _c))
+        out_hi = self.tanh(out_hi)
         return out_hi, out_lo
 
     def training_step(self, batch, opt_func=torch.optim.Adam):
@@ -168,7 +180,7 @@ class BaggingLstmVAE:
              for _ in range(self.n_estimators)])
         self.DivLstmVAEs = nn.ModuleList(
             [DivLstmVAE(lstmvae_model=self.LSTMVAEs[i], input_shape=input_dim,
-                        latent_dim=latent_dim, decoder_depth=decoding_depth)
+                        latent_dim=latent_dim, hidden_size=hidden_size)
              for i in range(self.n_estimators)])
 
 
@@ -197,6 +209,9 @@ def training(encoder_epochs, decoder_epochs, model, train_loader, opt_func=torch
             epoch, np.array(loss_low_sum).mean(), np.array(loss_high_sum).mean()))
 
 
+
+
+# 返回 upper,lower的顺序
 def testing(model, test_loader):
     with torch.no_grad():
         results_l, results_u = [], []
