@@ -76,8 +76,8 @@ class Vae(nn.Module):
         return res, z_mean, z_log
 
     def loss_function(self, origin, reconstruction, mean, log_var):
-        BCE_LOSS = nn.BCELoss()
-        reconstruction_loss = BCE_LOSS(reconstruction, origin)
+        MSE_LOSS = nn.MSELoss()
+        reconstruction_loss = MSE_LOSS(reconstruction, origin)
         KL_divergence = -0.5 * torch.sum(1 + log_var - torch.exp(log_var) - mean * mean)
         return reconstruction_loss + KL_divergence
 
