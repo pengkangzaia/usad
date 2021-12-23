@@ -139,12 +139,8 @@ class DivLstmVAE(nn.Module):
         c0 = torch.empty(self.num_layers, batch_size, self.hidden_size)
         nn.init.xavier_normal(h0)
         nn.init.xavier_normal(c0)
-        print(h0.device)
-        print(c0.device)
-        h0.to(device)
-        c0.to(device)
-        print(h0.device)
-        print(c0.device)
+        h0 = h0.to(device)
+        c0 = c0.to(device)
         return h0, c0
 
     def forward(self, input):
