@@ -34,19 +34,19 @@ class Decoder(nn.Module):
         self.latent_dim = latent_dim
         self.depth = depth
         self.hidden = nn.ModuleList(
-            [nn.Linear(int(output_shape / (2 ** (i + 1))), int(output_shape / (2 ** i))) for i in
-             reversed(range(depth))]
+            [nn.Linear(int(self.latent_dim * (2 ** i)), int(self.latent_dim * (2 ** (i+1)))) for i in
+             range(depth)]
         )
-        self.restored = nn.Linear(int(latent_dim), int(output_shape / (2 ** depth)))
+        self.restored = nn.Linear(int(latent_dim * (2 ** depth)), int(output_shape))
         self.ReLU = nn.ReLU(inplace=True)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, input):
-        x = self.restored(input)
-        for i in range(0, self.depth - 1):
+        x = self.hidden[0](input)
+        for i in range(1, self.depth):
             x = self.hidden[i](x)
             x = self.ReLU(x)
-        x = self.hidden[self.depth - 1](x)
+        x = self.restored(x)
         x = self.sigmoid(x)
         return x
 
@@ -117,16 +117,18 @@ class BaggingAE:
 
 
 def training(epochs, model, train_loader, opt_func=torch.optim.Adam):
-    for i in range(model.n_estimators):
-        for epoch in range(epochs):
-            loss_low_sum, loss_high_sum = [], []
-            for [batch] in train_loader:
-                batch = to_device(batch, device)
+    for epoch in range(epochs):
+        loss_low_sum, loss_high_sum = [], []
+        for [batch] in train_loader:
+            batch = to_device(batch, device)
+            for i in range(model.n_estimators):
                 loss_l, loss_u = model.DivAEs[i].training_step(batch, opt_func=opt_func)
                 loss_low_sum.append(loss_l.detach().cpu().numpy())
                 loss_high_sum.append(loss_u.detach().cpu().numpy())
-            print('estimator[{}], Epoch[{}]  loss_low: {:.8f}, loss_high: {:.8f}'.format(
-                i, epoch, np.array(loss_low_sum).mean(), np.array(loss_high_sum).mean()))
+        print('Epoch[{}]  loss_low: {:.8f}, loss_high: {:.8f}'.format(
+            epoch, np.array(loss_low_sum).mean(), np.array(loss_high_sum).mean()))
+
+
 
 
 def testing(model, test_loader):
