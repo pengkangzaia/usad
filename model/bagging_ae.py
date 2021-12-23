@@ -82,8 +82,7 @@ class DivAE(nn.Module):
         return w_l, w_u
 
     def training_step(self, batch, opt_func=torch.optim.Adam):
-        optimizer = opt_func(
-            list(self.encoder.parameters()) + list(self.decoder_lb.parameters()) + list(self.decoder_ub.parameters()))
+        optimizer = opt_func(self.parameters())
         o_l, o_u = self.forward(batch)
         loss_u = torch.mean(quantile_loss(1 - self.delta, batch, o_u), dim=0)
         loss_l = torch.mean(quantile_loss(self.delta, batch, o_l), dim=0)
