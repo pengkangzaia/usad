@@ -85,12 +85,12 @@ class DivAE(nn.Module):
         optimizer = opt_func(
             list(self.encoder.parameters()) + list(self.decoder_lb.parameters()) + list(self.decoder_ub.parameters()))
         o_l, o_u = self.forward(batch)
-        loss_l = torch.mean(quantile_loss(1 - self.delta, batch, o_l), dim=0)
-        loss_u = torch.mean(quantile_loss(self.delta, batch, o_u), dim=0)
+        loss_u = torch.mean(quantile_loss(1 - self.delta, batch, o_l), dim=0)
+        loss_l = torch.mean(quantile_loss(self.delta, batch, o_u), dim=0)
         loss = loss_l + loss_u
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        optimizer.zero_grad()
         return loss_l, loss_u
 
 
@@ -126,7 +126,7 @@ def training(epochs, model, train_loader, opt_func=torch.optim.Adam):
                 loss_l, loss_u = model.DivAEs[i].training_step(batch, opt_func=opt_func)
                 loss_low_sum.append(loss_l.detach().cpu().numpy())
                 loss_high_sum.append(loss_u.detach().cpu().numpy())
-        print('Epoch[{}]  loss_low: {:.4f}, loss_high: {:.4f}'.format(
+        print('Epoch[{}]  loss_low: {:.8f}, loss_high: {:.8f}'.format(
             epoch, np.array(loss_low_sum).mean(), np.array(loss_high_sum).mean()))
 
 
