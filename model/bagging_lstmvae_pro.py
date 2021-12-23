@@ -108,24 +108,36 @@ class LSTMVAE(nn.Module):
 
 
 class DivLstmVAE(nn.Module):
-    def __init__(self, lstmvae_model: LSTMVAE, input_shape, latent_dim: int, hidden_size: int, decoder_depth: int = 2,
-                 delta: float = 0.05):
+    def __init__(self, input_shape, latent_dim: int, hidden_size: int, decoder_depth: int = 2,
+                 delta: float = 0.05, max_features: int = 3):
         super(DivLstmVAE, self).__init__()
-        self.lstm_vae = lstmvae_model
         self.input_shape = input_shape
         self.hidden_size = hidden_size
         self.latent_dim = latent_dim
         self.delta = delta
         self.num_layers = 2
         self.decoder_depth = decoder_depth
+        self.max_features = max_features
 
+        # common
+        self.ReLU = nn.ReLU(inplace=True)
+        self.tanh = nn.Tanh()
+
+        # encoder
+        # LSTM: mapping data to hidden space
+        self.encoder_LSTM = nn.LSTM(input_size=max_features, hidden_size=hidden_size, batch_first=True, num_layers=2)
+        # liner layer: mapping hidden space to μ and σ
+        self.z_mean_linear = nn.Linear(in_features=hidden_size, out_features=latent_dim)
+        self.z_sigma_linear = nn.Linear(in_features=hidden_size, out_features=latent_dim)
+
+        # decoder
         self.hidden_LSTM = nn.LSTM(input_size=latent_dim, hidden_size=hidden_size, batch_first=True,
                                    num_layers=self.num_layers)
-        # self.output_LSTM = nn.LSTM(input_size=hidden_size, hidden_size=input_shape, batch_first=True,
-        #                            num_layers=self.num_layers)
-        self.tanh = nn.Tanh()
         self.decoder_hi = Decoder(output_shape=input_shape, latent_dim=hidden_size, depth=self.decoder_depth)
         self.decoder_lo = Decoder(output_shape=input_shape, latent_dim=hidden_size, depth=self.decoder_depth)
+
+        # feature extractor
+        self.random_samples = np.random.choice(input_shape, replace=False, size=self.max_features)
 
     # Loss function
     def quantile_loss(self, q, y, f):
@@ -144,32 +156,32 @@ class DivLstmVAE(nn.Module):
         return h0, c0
 
     def forward(self, input):
-        with torch.no_grad():
-            encode_h, (_h, _c) = self.lstm_vae.encoder_LSTM(input[:, :, self.lstm_vae.random_samples])
-            encode_h = self.lstm_vae.tanh(encode_h)
-            z_mean = self.lstm_vae.ReLU(self.lstm_vae.z_mean_linear(encode_h[:, -1, :]))
-            z_log = self.lstm_vae.ReLU(self.lstm_vae.z_sigma_linear(encode_h[:, -1, :]))
-            z = re_parameterization(z_mean, z_log)
-            repeated_z = torch.unsqueeze(z, 1).repeat(1, input.shape[1], 1)
+        encode_h, (_h, _c) = self.encoder_LSTM(input[:, :, self.random_samples])
+        encode_h = self.tanh(encode_h)
+        z_mean = self.ReLU(self.z_mean_linear(encode_h[:, -1, :]))
+        z_log = self.ReLU(self.z_sigma_linear(encode_h[:, -1, :]))
+        z = re_parameterization(z_mean, z_log)
+        repeated_z = torch.unsqueeze(z, 1).repeat(1, input.shape[1], 1)
 
         out, (_h, _c) = self.hidden_LSTM(repeated_z, self.init_hidden(input.shape[0]))
         out = self.tanh(out)
 
         out_hi = self.decoder_hi(out[:, -1, :])
         out_lo = self.decoder_lo(out[:, -1, :])
-        return out_hi, out_lo
+        return out_hi, out_lo, z_mean, z_log
 
     def training_step(self, batch, opt_func=torch.optim.Adam):
-        optimizer = opt_func(list(self.hidden_LSTM.parameters())
-                             + list(self.decoder_hi.parameters()) + list(self.decoder_lo.parameters()))
-        o_hi, o_lo = self.forward(batch)
+        optimizer = opt_func(self.parameters())
+        o_hi, o_lo, z_mean, z_log = self.forward(batch)
         loss_hi = torch.mean(self.quantile_loss(1 - self.delta, batch[:, -1, :], o_hi), dim=0)
         loss_lo = torch.mean(self.quantile_loss(self.delta, batch[:, -1, :], o_lo), dim=0)
+        KL_divergence = -0.5 * torch.sum(1 + z_log - torch.exp(z_log) - z_mean * z_mean)
+
         # loss_hi_sum = torch.sum(self.quantile_loss(self.delta, batch[:, -1, :], o_lo), dim=0)
         # loss_lo_sum = torch.sum(self.quantile_loss(self.delta, batch[:, -1, :], o_lo), dim=0)
         # loss_hi_a = self.quantile_loss(1 - self.delta, batch[:, -1, :], o_hi)
         # loss_lo_a = self.quantile_loss(self.delta, batch[:, -1, :], o_lo)
-        loss = loss_hi + loss_lo
+        loss = loss_hi + loss_lo + KL_divergence + KL_divergence
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
@@ -188,30 +200,18 @@ class BaggingLstmVAE:
         self.latent_dim = latent_dim
         # quantile bound for regression
         self.delta = delta
-        self.LSTMVAEs = nn.ModuleList(
-            [LSTMVAE(time_step=time_step, input_size=input_dim, hidden_size=hidden_size, latent_size=latent_dim,
-                     max_features=max_features)
-             for _ in range(self.n_estimators)])
         self.DivLstmVAEs = nn.ModuleList(
-            [DivLstmVAE(lstmvae_model=self.LSTMVAEs[i], input_shape=input_dim,
-                        latent_dim=latent_dim, hidden_size=hidden_size, decoder_depth=decoding_depth)
-             for i in range(self.n_estimators)])
+            [DivLstmVAE(input_shape=input_dim,
+                        latent_dim=latent_dim,
+                        hidden_size=hidden_size,
+                        decoder_depth=decoding_depth,
+                        max_features=max_features)
+             for _ in range(self.n_estimators)])
 
 
-def training(encoder_epochs, decoder_epochs, model, train_loader, opt_func=torch.optim.Adam):
-    # 阶段1：训练VAE中的encoder
-    print('VAE encoder开始训练')
-    for epoch in range(encoder_epochs):
-        vae_losses = []
-        for [batch] in train_loader:
-            batch = to_device(batch, device)
-            for i in range(model.n_estimators):
-                vae_loss = model.LSTMVAEs[i].training_step(batch, opt_func=opt_func)
-                vae_losses.append(vae_loss.detach().cpu().numpy())
-        print('Epoch[{}]  loss_vae: {:.7f}'.format(epoch, np.array(vae_losses).mean()))
-    # 阶段2：训练upper bound decoder和lower bound decoder
-    print('lower decoder, upper decoder开始训练')
-    for epoch in range(decoder_epochs):
+def training(epochs, model, train_loader, opt_func=torch.optim.Adam):
+    print('开始训练')
+    for epoch in range(epochs):
         loss_low_sum, loss_high_sum = [], []
         for [batch] in train_loader:
             batch = to_device(batch, device)
@@ -231,7 +231,7 @@ def testing(model, test_loader):
             batch = to_device(batch, device)
             w_l_estimator_sum, w_u_estimator_sum = [], []
             for i in range(model.n_estimators):
-                w_u, w_l = model.DivLstmVAEs[i].forward(batch)
+                w_u, w_l, _mean, _log = model.DivLstmVAEs[i].forward(batch)
                 w_u_estimator_sum.append(torch.unsqueeze(w_u, dim=0))
                 w_l_estimator_sum.append(torch.unsqueeze(w_l, dim=0))
             out_u = torch.cat(w_u_estimator_sum, dim=0)
