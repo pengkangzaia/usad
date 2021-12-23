@@ -181,10 +181,10 @@ class DivLstmVAE(nn.Module):
         # loss_lo_sum = torch.sum(self.quantile_loss(self.delta, batch[:, -1, :], o_lo), dim=0)
         # loss_hi_a = self.quantile_loss(1 - self.delta, batch[:, -1, :], o_hi)
         # loss_lo_a = self.quantile_loss(self.delta, batch[:, -1, :], o_lo)
+        optimizer.zero_grad()
         loss = loss_hi + loss_lo + KL_divergence + KL_divergence
         loss.backward()
         optimizer.step()
-        optimizer.zero_grad()
         return loss_hi, loss_lo
 
 
