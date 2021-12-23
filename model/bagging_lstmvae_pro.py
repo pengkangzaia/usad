@@ -91,8 +91,9 @@ class LSTMVAE(nn.Module):
     # loss function
     def loss_function(self, origin, reconstruction, mean, log_var):
         MSELoss = nn.MSELoss(reduction='sum')
-        reconstruction_loss = MSELoss(reconstruction, origin)
-        KL_divergence = -0.5 * torch.sum(1 + log_var - torch.exp(log_var) - mean * mean) * origin.shape[1]
+        reconstruction_loss = MSELoss(reconstruction[:, -1, :], origin[:, -1, :])
+        # KL_divergence = -0.5 * torch.sum(1 + log_var - torch.exp(log_var) - mean * mean) * origin.shape[1]
+        KL_divergence = -0.5 * torch.sum(1 + log_var - torch.exp(log_var) - mean * mean)
         return reconstruction_loss + KL_divergence
 
     # training
@@ -107,28 +108,40 @@ class LSTMVAE(nn.Module):
 
 
 class DivLstmVAE(nn.Module):
-    def __init__(self, lstmvae_model: LSTMVAE, input_shape, latent_dim: int,hidden_size: int,
+    def __init__(self, lstmvae_model: LSTMVAE, input_shape, latent_dim: int, hidden_size: int, decoder_depth: int = 2,
                  delta: float = 0.05):
         super(DivLstmVAE, self).__init__()
         self.lstm_vae = lstmvae_model
         self.input_shape = input_shape
+        self.hidden_size = hidden_size
         self.latent_dim = latent_dim
         self.delta = delta
+        self.num_layers = 2
+        self.decoder_depth = decoder_depth
 
-        self.hidden_LSTM_lo = nn.LSTM(input_size=latent_dim, hidden_size=hidden_size, batch_first=True, num_layers=2)
-        self.output_LSTM_lo = nn.LSTM(input_size=hidden_size, hidden_size=input_shape, batch_first=True, num_layers=2)
-        self.hidden_LSTM_hi = nn.LSTM(input_size=latent_dim, hidden_size=hidden_size, batch_first=True, num_layers=2)
-        self.output_LSTM_hi = nn.LSTM(input_size=hidden_size, hidden_size=input_shape, batch_first=True, num_layers=2)
+        self.hidden_LSTM = nn.LSTM(input_size=latent_dim, hidden_size=hidden_size, batch_first=True,
+                                   num_layers=self.num_layers)
+        # self.output_LSTM = nn.LSTM(input_size=hidden_size, hidden_size=input_shape, batch_first=True,
+        #                            num_layers=self.num_layers)
         self.tanh = nn.Tanh()
-        # self.decoder_hi = Decoder(output_shape=input_shape, latent_dim=latent_dim, depth=self.decoder_depth)
-        # self.decoder_lo = Decoder(output_shape=input_shape, latent_dim=latent_dim, depth=self.decoder_depth)
+        self.decoder_hi = Decoder(output_shape=input_shape, latent_dim=hidden_size, depth=self.decoder_depth)
+        self.decoder_lo = Decoder(output_shape=input_shape, latent_dim=hidden_size, depth=self.decoder_depth)
 
     # Loss function
     def quantile_loss(self, q, y, f):
         e = y - f
-        a = torch.max(q * e, (1 - q) * e)
+        a = torch.max(q * e, (q - 1) * e)
         b = torch.sum(a, dim=-1)
         return b
+
+    def init_hidden(self, batch_size):
+        h0 = torch.empty(self.num_layers, batch_size, self.hidden_size)
+        c0 = torch.empty(self.num_layers, batch_size, self.hidden_size)
+        nn.init.xavier_normal(h0)
+        nn.init.xavier_normal(c0)
+        h0.to(device)
+        c0.to(device)
+        return h0, c0
 
     def forward(self, input):
         with torch.no_grad():
@@ -139,24 +152,23 @@ class DivLstmVAE(nn.Module):
             z = re_parameterization(z_mean, z_log)
             repeated_z = torch.unsqueeze(z, 1).repeat(1, input.shape[1], 1)
 
-        origin_h, origin_c = _h, _c
-        out_lo, (_h, _c) = self.hidden_LSTM_lo(repeated_z, (origin_h, origin_c))
-        out_lo = self.tanh(out_lo)
-        out_lo, (_h, _c) = self.output_LSTM_lo(out_lo)
-        out_lo = self.tanh(out_lo)
+        out, (_h, _c) = self.hidden_LSTM(repeated_z, self.init_hidden(input.shape[0]))
+        out = self.tanh(out)
 
-        out_hi, (_h, _c) = self.hidden_LSTM_hi(repeated_z, (origin_h, origin_c))
-        out_hi = self.tanh(out_hi)
-        out_hi, (_h, _c) = self.output_LSTM_lo(out_hi)
-        out_hi = self.tanh(out_hi)
+        out_hi = self.decoder_hi(out[:, -1, :])
+        out_lo = self.decoder_lo(out[:, -1, :])
         return out_hi, out_lo
 
     def training_step(self, batch, opt_func=torch.optim.Adam):
-        optimizer = opt_func(list(self.hidden_LSTM_lo.parameters()) + list(self.output_LSTM_lo.parameters())
-                             + list(self.hidden_LSTM_hi.parameters()) + list(self.output_LSTM_hi.parameters()))
+        optimizer = opt_func(list(self.hidden_LSTM.parameters())
+                             + list(self.decoder_hi.parameters()) + list(self.decoder_lo.parameters()))
         o_hi, o_lo = self.forward(batch)
-        loss_hi = torch.mean(torch.mean(self.quantile_loss(1 - self.delta, batch, o_hi), dim=0))
-        loss_lo = torch.mean(torch.mean(self.quantile_loss(self.delta, batch, o_lo), dim=0))
+        loss_hi = torch.mean(self.quantile_loss(1 - self.delta, batch[:, -1, :], o_hi), dim=0)
+        loss_lo = torch.mean(self.quantile_loss(self.delta, batch[:, -1, :], o_lo), dim=0)
+        # loss_hi_sum = torch.sum(self.quantile_loss(self.delta, batch[:, -1, :], o_lo), dim=0)
+        # loss_lo_sum = torch.sum(self.quantile_loss(self.delta, batch[:, -1, :], o_lo), dim=0)
+        # loss_hi_a = self.quantile_loss(1 - self.delta, batch[:, -1, :], o_hi)
+        # loss_lo_a = self.quantile_loss(self.delta, batch[:, -1, :], o_lo)
         loss = loss_hi + loss_lo
         loss.backward()
         optimizer.step()
@@ -182,7 +194,7 @@ class BaggingLstmVAE:
              for _ in range(self.n_estimators)])
         self.DivLstmVAEs = nn.ModuleList(
             [DivLstmVAE(lstmvae_model=self.LSTMVAEs[i], input_shape=input_dim,
-                        latent_dim=latent_dim, hidden_size=hidden_size)
+                        latent_dim=latent_dim, hidden_size=hidden_size, decoder_depth=decoding_depth)
              for i in range(self.n_estimators)])
 
 
@@ -211,8 +223,6 @@ def training(encoder_epochs, decoder_epochs, model, train_loader, opt_func=torch
             epoch, np.array(loss_low_sum).mean(), np.array(loss_high_sum).mean()))
 
 
-
-
 # 返回 upper,lower的顺序
 def testing(model, test_loader):
     with torch.no_grad():
@@ -222,8 +232,6 @@ def testing(model, test_loader):
             w_l_estimator_sum, w_u_estimator_sum = [], []
             for i in range(model.n_estimators):
                 w_u, w_l = model.DivLstmVAEs[i].forward(batch)
-                w_u = w_u[:, -1, :]
-                w_l = w_l[:, -1, :]
                 w_u_estimator_sum.append(torch.unsqueeze(w_u, dim=0))
                 w_l_estimator_sum.append(torch.unsqueeze(w_l, dim=0))
             out_u = torch.cat(w_u_estimator_sum, dim=0)
