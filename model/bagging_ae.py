@@ -87,8 +87,8 @@ class DivAE(nn.Module):
         loss_u = torch.mean(quantile_loss(1 - self.delta, batch, o_u), dim=0)
         loss_l = torch.mean(quantile_loss(self.delta, batch, o_l), dim=0)
         optimizer.zero_grad()
-        loss_u.backward()
-        loss_l.backward()
+        loss = loss_u + loss_l
+        loss.backward()
         optimizer.step()
         return loss_l, loss_u
 
